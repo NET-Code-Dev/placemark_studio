@@ -262,8 +262,8 @@ class HomeViewModel extends BaseViewModel {
     }
 
     // For now, create one file per layer (this would need layer detection logic)
-    // This is a simplified implementation - you'd need to enhance the KML parser
-    // to properly separate layers
+    // This is a simplified implementation - need to enhance the KML parser to
+    // properly separate layers
 
     final layerCount = _kmlData!.layersCount;
     final filesCreated = <String>[];
@@ -273,7 +273,7 @@ class HomeViewModel extends BaseViewModel {
       final layerFilePath = path.join(folderPath, layerFileName);
 
       // For now, just create the main file for each "layer"
-      // In a full implementation, you'd filter placemarks by layer
+      // In a full implementation, filter placemarks by layer
       final exportOptions = ExportOptions(
         format: _selectedExportFormat,
         outputPath: layerFilePath,

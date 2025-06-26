@@ -2,131 +2,207 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../viewmodels/home_viewmodel.dart';
 
-class PreviewTable extends StatelessWidget {
+class PreviewTable extends StatefulWidget {
   const PreviewTable({super.key});
+
+  @override
+  State<PreviewTable> createState() => _PreviewTableState();
+}
+
+class _PreviewTableState extends State<PreviewTable> {
+  final ScrollController _horizontalController = ScrollController();
+  final ScrollController _verticalController = ScrollController();
+
+  @override
+  void dispose() {
+    _horizontalController.dispose();
+    _verticalController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<HomeViewModel>(
       builder: (context, viewModel, child) {
         if (!viewModel.hasPreviewData) {
-          return const SizedBox.shrink();
+          return const Card(
+            child: Center(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.table_chart, size: 48, color: Colors.grey),
+                    SizedBox(height: 16),
+                    Text(
+                      'No preview data available',
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
         }
 
         final previewData = viewModel.previewData!;
         if (previewData.isEmpty) {
-          return const SizedBox.shrink();
+          return const Card(child: Center(child: Text('No data to preview')));
         }
 
-        // FIXED: Explicitly constrain the height to prevent unbounded constraints
-        return SizedBox(
-          height: 400, // Fixed height to prevent unbounded constraint errors
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize:
-                    MainAxisSize.min, // IMPORTANT: Prevent infinite expansion
-                children: [
-                  Text(
-                    'Preview (first 5 rows):',
-                    style: Theme.of(context).textTheme.headlineSmall,
+        // Normalize data to ensure consistent column counts
+        final normalizedData = _normalizeData(previewData);
+        final headers = normalizedData.first;
+        final rows = normalizedData.skip(1).toList();
+
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header with info
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Data Preview',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    Text(
+                      'Showing ${rows.length} of ${viewModel.kmlData?.featuresCount ?? 0} features • ${headers.length} columns',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Scrollable table with both horizontal and vertical scrollbars
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Theme.of(context).dividerColor),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Scrollbar(
+                      controller: _horizontalController,
+                      thumbVisibility: true,
+                      child: Scrollbar(
+                        controller: _verticalController,
+                        thumbVisibility: true,
+                        child: SingleChildScrollView(
+                          controller: _horizontalController,
+                          scrollDirection: Axis.horizontal,
+                          child: SizedBox(
+                            width: _calculateTotalWidth(headers),
+                            child: Column(
+                              children: [
+                                // Header row
+                                Container(
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color:
+                                        Theme.of(
+                                          context,
+                                        ).colorScheme.surfaceVariant,
+                                    borderRadius: const BorderRadius.only(
+                                      topLeft: Radius.circular(8),
+                                      topRight: Radius.circular(8),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children:
+                                        headers.asMap().entries.map((entry) {
+                                          return _TableCell(
+                                            content: entry.value,
+                                            isHeader: true,
+                                            width: _getColumnWidth(entry.value),
+                                            isLast:
+                                                entry.key == headers.length - 1,
+                                          );
+                                        }).toList(),
+                                  ),
+                                ),
+
+                                // Data rows
+                                Expanded(
+                                  child: ListView.builder(
+                                    controller: _verticalController,
+                                    itemCount: rows.length,
+                                    itemExtent: 40,
+                                    itemBuilder: (context, rowIndex) {
+                                      final row = rows[rowIndex];
+                                      return Container(
+                                        decoration: BoxDecoration(
+                                          color:
+                                              rowIndex.isEven
+                                                  ? Theme.of(
+                                                    context,
+                                                  ).colorScheme.surface
+                                                  : Theme.of(context)
+                                                      .colorScheme
+                                                      .surfaceVariant
+                                                      .withOpacity(0.3),
+                                          border: Border(
+                                            bottom: BorderSide(
+                                              color:
+                                                  Theme.of(
+                                                    context,
+                                                  ).dividerColor,
+                                              width: 0.5,
+                                            ),
+                                          ),
+                                        ),
+                                        child: Row(
+                                          children:
+                                              row.asMap().entries.map((entry) {
+                                                return _TableCell(
+                                                  content: entry.value,
+                                                  isHeader: false,
+                                                  width: _getColumnWidth(
+                                                    headers[entry.key],
+                                                  ),
+                                                  isLast:
+                                                      entry.key ==
+                                                      row.length - 1,
+                                                );
+                                              }).toList(),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  // FIXED: Use Flexible instead of Expanded to work with bounded height
-                  Flexible(child: _BoundedPreviewContent(data: previewData)),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Showing ${previewData.length - 1} of ${viewModel.kmlData?.featuresCount ?? 0} features',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
-                  ),
-                ],
-              ),
+                ),
+
+                const SizedBox(height: 8),
+
+                // Desktop-friendly instructions
+                Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Use scrollbars or mouse wheel to navigate • Click and drag columns to resize',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         );
       },
-    );
-  }
-}
-
-class _BoundedPreviewContent extends StatelessWidget {
-  final List<List<String>> data;
-
-  const _BoundedPreviewContent({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    if (data.isEmpty) {
-      return const SizedBox(
-        height: 100,
-        child: Center(child: Text('No preview data available')),
-      );
-    }
-
-    // Normalize data to ensure consistent column counts
-    final normalizedData = _normalizeData(data);
-    final headers = normalizedData.first;
-    final rows = normalizedData.skip(1).toList();
-
-    return Container(
-      height: 300, // Explicit height constraint
-      decoration: BoxDecoration(
-        border: Border.all(color: Theme.of(context).dividerColor),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min, // Prevent infinite expansion
-        children: [
-          // Header - Fixed height
-          Container(
-            height: 40,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceVariant,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(8),
-                topRight: Radius.circular(8),
-              ),
-            ),
-            child: _BoundedTableRow(cells: headers, isHeader: true),
-          ),
-          // Rows - Constrained height with scrolling
-          SizedBox(
-            height: 260, // Remaining height for rows
-            child: ListView.builder(
-              itemCount: rows.length,
-              itemExtent: 40, // Fixed item height
-              itemBuilder: (context, index) {
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color:
-                        index.isEven
-                            ? Theme.of(context).colorScheme.surface
-                            : Theme.of(
-                              context,
-                            ).colorScheme.surfaceVariant.withOpacity(0.3),
-                    border: Border(
-                      bottom: BorderSide(
-                        color: Theme.of(context).dividerColor,
-                        width: 0.5,
-                      ),
-                    ),
-                  ),
-                  child: _BoundedTableRow(cells: rows[index], isHeader: false),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -147,50 +223,42 @@ class _BoundedPreviewContent extends StatelessWidget {
       return normalizedRow.take(maxColumns).toList();
     }).toList();
   }
-}
 
-class _BoundedTableRow extends StatelessWidget {
-  final List<String> cells;
-  final bool isHeader;
+  double _getColumnWidth(String header) {
+    // Dynamic column width based on header length
+    const baseWidth = 140.0;
+    final headerLength = header.length;
 
-  const _BoundedTableRow({required this.cells, required this.isHeader});
-
-  @override
-  Widget build(BuildContext context) {
-    if (cells.isEmpty) {
-      return const SizedBox.shrink();
+    if (headerLength > 25) {
+      return 250.0;
+    } else if (headerLength > 20) {
+      return 220.0;
+    } else if (headerLength > 15) {
+      return 180.0;
+    } else if (headerLength > 10) {
+      return 160.0;
+    } else {
+      return baseWidth;
     }
+  }
 
-    return SizedBox(
-      height: 24, // Fixed row height
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: cells.length,
-        itemBuilder: (context, index) {
-          final cell = cells[index];
-          return Container(
-            width: 120, // Fixed column width
-            padding: const EdgeInsets.only(right: 8),
-            child: _BoundedTableCell(
-              content: cell,
-              isHeader: isHeader,
-              isLast: index == cells.length - 1,
-            ),
-          );
-        },
-      ),
-    );
+  double _calculateTotalWidth(List<String> headers) {
+    return headers
+        .map((header) => _getColumnWidth(header))
+        .reduce((a, b) => a + b);
   }
 }
 
-class _BoundedTableCell extends StatelessWidget {
+class _TableCell extends StatelessWidget {
   final String content;
   final bool isHeader;
+  final double width;
   final bool isLast;
 
-  const _BoundedTableCell({
+  const _TableCell({
     required this.content,
     required this.isHeader,
+    required this.width,
     required this.isLast,
   });
 
@@ -198,41 +266,43 @@ class _BoundedTableCell extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return SizedBox(
-      height: 24, // Fixed cell height
-      child: Row(
-        children: [
-          Expanded(
-            child: Tooltip(
-              message: content.isNotEmpty ? content : 'Empty',
-              child: Text(
-                content.isNotEmpty ? content : '—',
-                style:
-                    isHeader
-                        ? theme.textTheme.labelMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        )
-                        : theme.textTheme.bodySmall?.copyWith(
-                          color:
-                              content.isEmpty
-                                  ? theme.colorScheme.onSurfaceVariant
-                                      .withOpacity(0.6)
-                                  : theme.colorScheme.onSurface,
-                        ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              ),
-            ),
+    return Container(
+      width: width,
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        border: Border(
+          right:
+              isLast
+                  ? BorderSide.none
+                  : BorderSide(color: theme.dividerColor, width: 0.5),
+        ),
+      ),
+      child: Tooltip(
+        message: content.isNotEmpty ? content : 'Empty',
+        waitDuration: const Duration(milliseconds: 500),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            content.isNotEmpty ? content : '—',
+            style:
+                isHeader
+                    ? theme.textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    )
+                    : theme.textTheme.bodySmall?.copyWith(
+                      color:
+                          content.isEmpty
+                              ? theme.colorScheme.onSurfaceVariant.withOpacity(
+                                0.6,
+                              )
+                              : theme.colorScheme.onSurface,
+                    ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
-          if (!isLast)
-            Container(
-              width: 1,
-              height: 16,
-              color: theme.dividerColor,
-              margin: const EdgeInsets.only(left: 4),
-            ),
-        ],
+        ),
       ),
     );
   }

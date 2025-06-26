@@ -122,17 +122,33 @@ class _StaticMap extends StatelessWidget {
 
     return Stack(
       children: [
+        // Local fallback background - no network request
         Container(
           decoration: BoxDecoration(
             color: Colors.grey[100],
-            image: const DecorationImage(
-              image: NetworkImage(
-                'https://via.placeholder.com/400x200/e0e0e0/9e9e9e?text=Loading+Map',
-              ),
-              fit: BoxFit.cover,
+            // Removed the NetworkImage that was causing the error
+          ),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.map, size: 24, color: Colors.grey[600]),
+                const SizedBox(height: 4),
+                Text(
+                  'Map Preview',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${center.latitude.toStringAsFixed(4)}, ${center.longitude.toStringAsFixed(4)}',
+                  style: TextStyle(fontSize: 8, color: Colors.grey[500]),
+                ),
+              ],
             ),
           ),
         ),
+        // Actual map tile (with better error handling)
         Image.network(
           mapUrl,
           fit: BoxFit.cover,
@@ -146,16 +162,25 @@ class _StaticMap extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.map, size: 24, color: Colors.grey[600]),
+                    Icon(Icons.map_outlined, size: 32, color: Colors.grey[600]),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Map Unavailable',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     Text(
-                      'Map Preview',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                      'Center: ${center.latitude.toStringAsFixed(4)}, ${center.longitude.toStringAsFixed(4)}',
+                      style: TextStyle(fontSize: 10, color: Colors.grey[500]),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${center.latitude.toStringAsFixed(4)}, ${center.longitude.toStringAsFixed(4)}',
-                      style: TextStyle(fontSize: 8, color: Colors.grey[500]),
+                      'Zoom: $zoom',
+                      style: TextStyle(fontSize: 10, color: Colors.grey[500]),
                     ),
                   ],
                 ),
@@ -167,17 +192,28 @@ class _StaticMap extends StatelessWidget {
             return Container(
               color: Colors.grey[100],
               child: Center(
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    value:
-                        loadingProgress.expectedTotalBytes != null
-                            ? loadingProgress.cumulativeBytesLoaded /
-                                loadingProgress.expectedTotalBytes!
-                            : null,
-                  ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        value:
+                            loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!
+                                : null,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Loading Map...',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 10),
+                    ),
+                  ],
                 ),
               ),
             );

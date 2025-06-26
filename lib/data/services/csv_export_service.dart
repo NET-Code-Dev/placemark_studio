@@ -49,38 +49,29 @@ class CsvExportService implements ICsvExportService {
 
   @override
   Map<String, List<String>> detectDuplicateHeaders(KmlData kmlData) {
-    final headerCounts = <String, int>{};
-    final headerSources = <String, List<String>>{};
+    final duplicates = <String, List<String>>{};
 
-    // Track all header occurrences and their sources
     for (int i = 0; i < kmlData.placemarks.length; i++) {
       final placemark = kmlData.placemarks[i];
+      final placemarkName =
+          placemark.name.isNotEmpty ? placemark.name : 'Placemark ${i + 1}';
 
-      // From table data
-      final tableHeaders = _extractTableHeaders(placemark.description);
+      // Extract all headers from this placemark's description table
+      final tableHeaders = _extractAllTableHeaders(placemark.description);
+
+      // Find duplicates within this single table
+      final headerCounts = <String, int>{};
       for (final header in tableHeaders) {
         headerCounts[header] = (headerCounts[header] ?? 0) + 1;
-        headerSources
-            .putIfAbsent(header, () => [])
-            .add('Table in placemark ${i + 1}');
       }
 
-      // From extended data
-      for (final key in placemark.extendedData.keys) {
-        headerCounts[key] = (headerCounts[key] ?? 0) + 1;
-        headerSources
-            .putIfAbsent(key, () => [])
-            .add('Extended data in placemark ${i + 1}');
-      }
+      // Add headers that appear more than once in this table
+      headerCounts.forEach((header, count) {
+        if (count > 1) {
+          duplicates.putIfAbsent(header, () => []).add(placemarkName);
+        }
+      });
     }
-
-    // Return only duplicates
-    final duplicates = <String, List<String>>{};
-    headerCounts.forEach((header, count) {
-      if (count > 1) {
-        duplicates[header] = headerSources[header] ?? [];
-      }
-    });
 
     return duplicates;
   }
@@ -90,51 +81,95 @@ class CsvExportService implements ICsvExportService {
     KmlData kmlData,
     Map<String, bool> duplicateHandling,
   ) {
-    final allHeadersWithSource = <String>[];
-    final seenHeaders = <String, int>{};
-
-    // Base headers
-    allHeadersWithSource.addAll([
+    final allHeaders = <String>{
       'name',
       'description',
       'longitude',
       'latitude',
       'elevation',
-    ]);
+    };
 
-    // Process each placemark to build headers in order
+    // Process each placemark to build headers, handling duplicates
     for (final placemark in kmlData.placemarks) {
-      // From table data
-      final tableHeaders = _extractTableHeaders(placemark.description);
-      for (final header in tableHeaders) {
-        final shouldKeep = duplicateHandling[header] ?? true;
-        if (shouldKeep) {
-          if (seenHeaders.containsKey(header)) {
-            seenHeaders[header] = seenHeaders[header]! + 1;
-            allHeadersWithSource.add('${header}_${seenHeaders[header]}');
-          } else {
-            seenHeaders[header] = 1;
-            allHeadersWithSource.add(header);
-          }
-        }
-      }
+      final tableHeaders = _extractAllTableHeaders(placemark.description);
+      final processedHeaders = _processDuplicateHeaders(
+        tableHeaders,
+        duplicateHandling,
+      );
+      allHeaders.addAll(processedHeaders);
 
-      // From extended data
+      // Add extended data headers
       for (final key in placemark.extendedData.keys) {
         final shouldKeep = duplicateHandling[key] ?? true;
-        if (shouldKeep && !allHeadersWithSource.contains(key)) {
-          if (seenHeaders.containsKey(key)) {
-            seenHeaders[key] = seenHeaders[key]! + 1;
-            allHeadersWithSource.add('${key}_${seenHeaders[key]}');
-          } else {
-            seenHeaders[key] = 1;
-            allHeadersWithSource.add(key);
-          }
+        if (shouldKeep) {
+          allHeaders.add(key);
         }
       }
     }
 
-    return allHeadersWithSource.toSet().toList(); // Remove final duplicates
+    return allHeaders.toList();
+  }
+
+  /// Extract ALL headers from a description table, including duplicates
+  List<String> _extractAllTableHeaders(String description) {
+    final headers = <String>[];
+
+    if (!description.contains('<table') && !description.contains('<tr')) {
+      return headers;
+    }
+
+    try {
+      // Split by table rows
+      final rows = description.split('<tr');
+
+      for (final row in rows) {
+        if (!row.contains('<td') && !row.contains('<th')) continue;
+
+        final cells = _extractTableCells(row);
+        if (cells.length >= 2) {
+          // First cell is the header/key
+          final key = cells[0].trim();
+          if (key.isNotEmpty &&
+              !key.toLowerCase().contains('field') &&
+              !key.toLowerCase().contains('value')) {
+            headers.add(key);
+          }
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Warning: Failed to parse table headers in description: $e');
+      }
+    }
+
+    return headers;
+  }
+
+  /// Process duplicate headers within a single table
+  List<String> _processDuplicateHeaders(
+    List<String> tableHeaders,
+    Map<String, bool> duplicateHandling,
+  ) {
+    final processedHeaders = <String>[];
+    final headerCounts = <String, int>{};
+
+    for (final header in tableHeaders) {
+      final shouldKeep = duplicateHandling[header] ?? true;
+
+      if (shouldKeep) {
+        if (headerCounts.containsKey(header)) {
+          // This is a duplicate - add with suffix
+          headerCounts[header] = headerCounts[header]! + 1;
+          processedHeaders.add('${header}_${headerCounts[header]}');
+        } else {
+          // First occurrence
+          headerCounts[header] = 1;
+          processedHeaders.add(header);
+        }
+      }
+    }
+
+    return processedHeaders;
   }
 
   List<String> _buildHeaders(KmlData kmlData, ExportOptions options) {
@@ -153,9 +188,9 @@ class CsvExportService implements ICsvExportService {
       'elevation',
     };
 
-    // Add headers from description tables
+    // Add headers from description tables (unique set)
     for (final placemark in kmlData.placemarks) {
-      final tableHeaders = _extractTableHeaders(placemark.description);
+      final tableHeaders = _extractUniqueTableHeaders(placemark.description);
       allHeaders.addAll(tableHeaders);
     }
 
@@ -168,6 +203,12 @@ class CsvExportService implements ICsvExportService {
     return allHeaders.toList();
   }
 
+  /// Extract unique headers from a description table (for building the header set)
+  List<String> _extractUniqueTableHeaders(String description) {
+    final allHeaders = _extractAllTableHeaders(description);
+    return allHeaders.toSet().toList(); // Remove duplicates for header building
+  }
+
   List<List<String>> _buildRows(
     KmlData kmlData,
     List<String> headers,
@@ -177,7 +218,7 @@ class CsvExportService implements ICsvExportService {
 
     for (final placemark in kmlData.placemarks) {
       final row = <String>[];
-      final tableData = _extractTableData(placemark.description);
+      final tableData = _extractTableDataWithDuplicates(placemark.description);
 
       for (final header in headers) {
         String value = '';
@@ -220,7 +261,8 @@ class CsvExportService implements ICsvExportService {
     return rows;
   }
 
-  Map<String, String> _extractTableData(String description) {
+  /// Extract table data handling duplicate headers with suffixes
+  Map<String, String> _extractTableDataWithDuplicates(String description) {
     final tableData = <String, String>{};
 
     if (!description.contains('<table') && !description.contains('<tr')) {
@@ -228,18 +270,29 @@ class CsvExportService implements ICsvExportService {
     }
 
     try {
-      // Simple HTML table parsing - look for table row patterns
       final rows = description.split('<tr');
+      final headerCounts = <String, int>{};
 
       for (final row in rows) {
         if (!row.contains('<td') && !row.contains('<th')) continue;
 
         final cells = _extractTableCells(row);
         if (cells.length >= 2) {
-          // Assume first cell is header/key, second is value
-          final key = cells[0].trim();
+          final originalKey = cells[0].trim();
           final value = cells[1].trim();
-          if (key.isNotEmpty) {
+
+          if (originalKey.isNotEmpty) {
+            String key;
+            if (headerCounts.containsKey(originalKey)) {
+              // This is a duplicate - add with suffix
+              headerCounts[originalKey] = headerCounts[originalKey]! + 1;
+              key = '${originalKey}_${headerCounts[originalKey]}';
+            } else {
+              // First occurrence
+              headerCounts[originalKey] = 1;
+              key = originalKey;
+            }
+
             tableData[key] = value;
           }
         }
@@ -254,11 +307,13 @@ class CsvExportService implements ICsvExportService {
     return tableData;
   }
 
+  Map<String, String> _extractTableData(String description) {
+    // Use the new method that handles duplicates
+    return _extractTableDataWithDuplicates(description);
+  }
+
   List<String> _extractTableHeaders(String description) {
-    final headers = <String>[];
-    final tableData = _extractTableData(description);
-    headers.addAll(tableData.keys);
-    return headers;
+    return _extractUniqueTableHeaders(description);
   }
 
   List<String> _extractTableCells(String row) {
