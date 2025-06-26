@@ -23,26 +23,30 @@ class BoundingBoxPreview extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   'Bounding Box Preview',
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: _BoundingBoxMap(boundingBox: boundingBox),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      flex: 3,
-                      child: _BoundingBoxCoordinates(boundingBox: boundingBox),
-                    ),
-                  ],
+                // Expanded to fill remaining height in the card
+                Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        flex: 3, // More space for the map
+                        child: _BoundingBoxMap(boundingBox: boundingBox),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        flex: 2, // Less space for coordinates
+                        child: _BoundingBoxCoordinates(
+                          boundingBox: boundingBox,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -60,27 +64,33 @@ class _BoundingBoxMap extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const mapHeight = 160.0;
-
     return Container(
-      height: mapHeight,
       decoration: BoxDecoration(
         border: Border.all(color: Theme.of(context).colorScheme.outline),
         borderRadius: BorderRadius.circular(8),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: Stack(
-          children: [
-            _StaticMap(boundingBox: boundingBox),
-            CustomPaint(
-              painter: _BoundingBoxOverlayPainter(
-                boundingBox: boundingBox,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ),
-            _CoordinatesOverlay(boundingBox: boundingBox),
-          ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return Stack(
+              children: [
+                _StaticMap(
+                  boundingBox: boundingBox,
+                  width: constraints.maxWidth,
+                  height: constraints.maxHeight,
+                ),
+                CustomPaint(
+                  size: Size(constraints.maxWidth, constraints.maxHeight),
+                  painter: _BoundingBoxOverlayPainter(
+                    boundingBox: boundingBox,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                _CoordinatesOverlay(boundingBox: boundingBox),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -89,8 +99,14 @@ class _BoundingBoxMap extends StatelessWidget {
 
 class _StaticMap extends StatelessWidget {
   final BoundingBox boundingBox;
+  final double width;
+  final double height;
 
-  const _StaticMap({required this.boundingBox});
+  const _StaticMap({
+    required this.boundingBox,
+    required this.width,
+    required this.height,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -120,106 +136,126 @@ class _StaticMap extends StatelessWidget {
     final mapUrl =
         'https://tile.openstreetmap.org/$zoom/${_lonToTileX(center.longitude, zoom)}/${_latToTileY(center.latitude, zoom)}.png';
 
-    return Stack(
-      children: [
-        // Local fallback background - no network request
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.grey[100],
-            // Removed the NetworkImage that was causing the error
-          ),
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.map, size: 24, color: Colors.grey[600]),
-                const SizedBox(height: 4),
-                Text(
-                  'Map Preview',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${center.latitude.toStringAsFixed(4)}, ${center.longitude.toStringAsFixed(4)}',
-                  style: TextStyle(fontSize: 8, color: Colors.grey[500]),
-                ),
-              ],
+    return SizedBox(
+      width: width,
+      height: height,
+      child: Stack(
+        children: [
+          // Local fallback background
+          Container(
+            width: width,
+            height: height,
+            decoration: BoxDecoration(color: Colors.grey[100]),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.map, size: 32, color: Colors.grey[600]),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Map Preview',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${center.latitude.toStringAsFixed(4)}, ${center.longitude.toStringAsFixed(4)}',
+                    style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        // Actual map tile (with better error handling)
-        Image.network(
-          mapUrl,
-          fit: BoxFit.cover,
-          width: double.infinity,
-          height: double.infinity,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              color: Colors.grey[200],
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.map_outlined, size: 32, color: Colors.grey[600]),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Map Unavailable',
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
+          // Actual map tile
+          Positioned.fill(
+            child: Image.network(
+              mapUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  width: width,
+                  height: height,
+                  color: Colors.grey[200],
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.map_outlined,
+                          size: 48,
+                          color: Colors.grey[600],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Map Unavailable',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Center: ${center.latitude.toStringAsFixed(4)}, ${center.longitude.toStringAsFixed(4)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Zoom: $zoom',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Center: ${center.latitude.toStringAsFixed(4)}, ${center.longitude.toStringAsFixed(4)}',
-                      style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+                  ),
+                );
+              },
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Container(
+                  width: width,
+                  height: height,
+                  color: Colors.grey[100],
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            value:
+                                loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Loading Map...',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Zoom: $zoom',
-                      style: TextStyle(fontSize: 10, color: Colors.grey[500]),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return Container(
-              color: Colors.grey[100],
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        value:
-                            loadingProgress.expectedTotalBytes != null
-                                ? loadingProgress.cumulativeBytesLoaded /
-                                    loadingProgress.expectedTotalBytes!
-                                : null,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Loading Map...',
-                      style: TextStyle(color: Colors.grey[600], fontSize: 10),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-      ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -257,7 +293,7 @@ class _BoundingBoxOverlayPainter extends CustomPainter {
           ..color = color.withOpacity(0.15)
           ..style = PaintingStyle.fill;
 
-    final padding = 15.0;
+    final padding = 20.0;
     final rect = Rect.fromLTWH(
       padding,
       padding,
@@ -273,7 +309,7 @@ class _BoundingBoxOverlayPainter extends CustomPainter {
           ..color = color
           ..style = PaintingStyle.fill;
 
-    const pointRadius = 3.0;
+    const pointRadius = 4.0;
 
     canvas.drawCircle(rect.topLeft, pointRadius, pointPaint);
     canvas.drawCircle(rect.topRight, pointRadius, pointPaint);
@@ -296,32 +332,32 @@ class _CoordinatesOverlay extends StatelessWidget {
       child: Stack(
         children: [
           Positioned(
-            top: 4,
-            left: 4,
+            top: 8,
+            left: 8,
             child: _CoordinateLabel(
               coordinate: boundingBox.northWest,
               label: 'NW',
             ),
           ),
           Positioned(
-            top: 4,
-            right: 4,
+            top: 8,
+            right: 8,
             child: _CoordinateLabel(
               coordinate: boundingBox.northEast,
               label: 'NE',
             ),
           ),
           Positioned(
-            bottom: 4,
-            left: 4,
+            bottom: 8,
+            left: 8,
             child: _CoordinateLabel(
               coordinate: boundingBox.southWest,
               label: 'SW',
             ),
           ),
           Positioned(
-            bottom: 4,
-            right: 4,
+            bottom: 8,
+            right: 8,
             child: _CoordinateLabel(
               coordinate: boundingBox.southEast,
               label: 'SE',
@@ -342,14 +378,19 @@ class _CoordinateLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(3),
+        color: Colors.black.withOpacity(0.8),
+        borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
         '$label\n${coordinate.latitude.toStringAsFixed(2)}\n${coordinate.longitude.toStringAsFixed(2)}',
-        style: const TextStyle(color: Colors.white, fontSize: 7, height: 1.1),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 8,
+          height: 1.2,
+          fontWeight: FontWeight.w500,
+        ),
         textAlign: TextAlign.center,
       ),
     );
@@ -364,62 +405,66 @@ class _BoundingBoxCoordinates extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textStyle = Theme.of(context).textTheme.bodySmall;
-    final labelStyle = textStyle?.copyWith(fontWeight: FontWeight.w600);
+    final labelStyle = textStyle?.copyWith(
+      fontWeight: FontWeight.w600,
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    );
 
-    return SizedBox(
-      height: 160,
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Coordinates:', style: labelStyle),
-            const SizedBox(height: 6),
-            _CoordinateItem(
-              label: 'North-West',
-              coordinate: boundingBox.northWest,
-              textStyle: textStyle,
-            ),
-            _CoordinateItem(
-              label: 'North-East',
-              coordinate: boundingBox.northEast,
-              textStyle: textStyle,
-            ),
-            _CoordinateItem(
-              label: 'South-West',
-              coordinate: boundingBox.southWest,
-              textStyle: textStyle,
-            ),
-            _CoordinateItem(
-              label: 'South-East',
-              coordinate: boundingBox.southEast,
-              textStyle: textStyle,
-            ),
-            const SizedBox(height: 6),
-            Text('Dimensions:', style: labelStyle),
-            const SizedBox(height: 3),
-            Text(
-              'Width: ${boundingBox.width.toStringAsFixed(4)}°',
-              style: textStyle,
-            ),
-            Text(
-              'Height: ${boundingBox.height.toStringAsFixed(4)}°',
-              style: textStyle,
-            ),
-            const SizedBox(height: 3),
-            Text(
-              'Center: ${boundingBox.center.longitude.toStringAsFixed(4)}°, ${boundingBox.center.latitude.toStringAsFixed(4)}°',
-              style: textStyle,
-            ),
-            const SizedBox(height: 6),
-            Text('Coverage:', style: labelStyle),
-            const SizedBox(height: 3),
-            Text(
-              _getAreaDescription(boundingBox.width, boundingBox.height),
-              style: textStyle,
-            ),
-          ],
-        ),
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Coordinates:', style: labelStyle),
+          const SizedBox(height: 8),
+          _CoordinateItem(
+            label: 'North-West',
+            coordinate: boundingBox.northWest,
+            textStyle: textStyle,
+          ),
+          const SizedBox(height: 4),
+          _CoordinateItem(
+            label: 'North-East',
+            coordinate: boundingBox.northEast,
+            textStyle: textStyle,
+          ),
+          const SizedBox(height: 4),
+          _CoordinateItem(
+            label: 'South-West',
+            coordinate: boundingBox.southWest,
+            textStyle: textStyle,
+          ),
+          const SizedBox(height: 4),
+          _CoordinateItem(
+            label: 'South-East',
+            coordinate: boundingBox.southEast,
+            textStyle: textStyle,
+          ),
+          const SizedBox(height: 16),
+          Text('Dimensions:', style: labelStyle),
+          const SizedBox(height: 6),
+          Text(
+            'Width: ${boundingBox.width.toStringAsFixed(4)}°',
+            style: textStyle,
+          ),
+          const SizedBox(height: 3),
+          Text(
+            'Height: ${boundingBox.height.toStringAsFixed(4)}°',
+            style: textStyle,
+          ),
+          const SizedBox(height: 3),
+          Text(
+            'Center: ${boundingBox.center.longitude.toStringAsFixed(4)}°, ${boundingBox.center.latitude.toStringAsFixed(4)}°',
+            style: textStyle,
+          ),
+          const SizedBox(height: 16),
+          Text('Coverage:', style: labelStyle),
+          const SizedBox(height: 6),
+          Text(
+            _getAreaDescription(boundingBox.width, boundingBox.height),
+            style: textStyle,
+          ),
+        ],
       ),
     );
   }
@@ -447,12 +492,9 @@ class _CoordinateItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 1),
-      child: Text(
-        '$label: ${coordinate.longitude.toStringAsFixed(4)}°, ${coordinate.latitude.toStringAsFixed(4)}°',
-        style: textStyle?.copyWith(fontSize: 11),
-      ),
+    return Text(
+      '$label: ${coordinate.longitude.toStringAsFixed(4)}°, ${coordinate.latitude.toStringAsFixed(4)}°',
+      style: textStyle?.copyWith(fontSize: 12),
     );
   }
 }

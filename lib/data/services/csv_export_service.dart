@@ -345,6 +345,12 @@ class CsvExportService implements ICsvExportService {
         .replaceAll('&gt;', '>')
         .replaceAll('&quot;', '"')
         .replaceAll('&#39;', "'")
+        // FIXED: Normalize line breaks to single spaces for CSV compatibility
+        .replaceAll(RegExp(r'\r?\n'), ' ') // Replace newlines with spaces
+        .replaceAll(
+          RegExp(r'\s+'),
+          ' ',
+        ) // Collapse multiple spaces to single space
         .trim();
   }
 
@@ -389,10 +395,24 @@ class CsvExportService implements ICsvExportService {
   }
 
   String _escapeCsvCell(String cell, String delimiter) {
+    // FIXED: Enhanced CSV cell escaping for better multi-line content handling
+    String cleanedCell = cell;
+
+    // Normalize whitespace and line breaks for CSV
+    cleanedCell =
+        cleanedCell
+            .replaceAll(RegExp(r'\r?\n'), ' ') // Convert newlines to spaces
+            .replaceAll(RegExp(r'\s+'), ' ') // Collapse multiple spaces
+            .trim();
+
     // Escape quotes and wrap in quotes if contains delimiter, quote, or newline
-    if (cell.contains(delimiter) || cell.contains('"') || cell.contains('\n')) {
-      return '"${cell.replaceAll('"', '""')}"';
+    if (cleanedCell.contains(delimiter) ||
+        cleanedCell.contains('"') ||
+        cleanedCell.contains('\n') ||
+        cleanedCell.contains('\r')) {
+      return '"${cleanedCell.replaceAll('"', '""')}"';
     }
-    return cell;
+
+    return cleanedCell;
   }
 }

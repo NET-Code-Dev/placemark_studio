@@ -27,8 +27,8 @@ class FileInfoPanel extends StatelessWidget {
                   'File Information',
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
-                const SizedBox(height: 12),
-                _InfoGrid(kmlData: kmlData),
+                const SizedBox(height: 16),
+                _InfoColumn(kmlData: kmlData),
               ],
             ),
           ),
@@ -38,95 +38,68 @@ class FileInfoPanel extends StatelessWidget {
   }
 }
 
-class _InfoGrid extends StatelessWidget {
+class _InfoColumn extends StatelessWidget {
   final KmlData kmlData;
 
-  const _InfoGrid({required this.kmlData});
+  const _InfoColumn({required this.kmlData});
 
   @override
   Widget build(BuildContext context) {
     final textStyle = Theme.of(context).textTheme.bodyMedium;
-    final labelStyle = textStyle?.copyWith(fontWeight: FontWeight.w600);
+    final labelStyle = textStyle?.copyWith(
+      fontWeight: FontWeight.w600,
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    );
 
     return Column(
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: _InfoItem(
-                label: 'File Name',
-                value: kmlData.fileName,
-                labelStyle: labelStyle,
-                textStyle: textStyle,
-              ),
-            ),
-            Expanded(
-              child: _InfoItem(
-                label: 'File Size',
-                value: FileUtils.formatFileSize(kmlData.fileSize),
-                labelStyle: labelStyle,
-                textStyle: textStyle,
-              ),
-            ),
-          ],
+        _InfoItem(
+          label: 'File Name',
+          value: kmlData.fileName,
+          labelStyle: labelStyle,
+          textStyle: textStyle,
         ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: _InfoItem(
-                label: 'Features Count',
-                value: '${kmlData.featuresCount}',
-                labelStyle: labelStyle,
-                textStyle: textStyle,
-              ),
-            ),
-            Expanded(
-              child: _InfoItem(
-                label: 'Layers Count',
-                value: '${kmlData.layersCount}',
-                labelStyle: labelStyle,
-                textStyle: textStyle,
-              ),
-            ),
-          ],
+        const SizedBox(height: 12),
+        _InfoItem(
+          label: 'File Size',
+          value: FileUtils.formatFileSize(kmlData.fileSize),
+          labelStyle: labelStyle,
+          textStyle: textStyle,
         ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: _InfoItem(
-                label: 'Coordinate System',
-                value: kmlData.coordinateSystem.value,
-                labelStyle: labelStyle,
-                textStyle: textStyle,
-              ),
-            ),
-            Expanded(
-              child: _InfoItem(
-                label: 'Available Fields',
-                value: '${kmlData.availableFields.length}',
-                labelStyle: labelStyle,
-                textStyle: textStyle,
-              ),
-            ),
-          ],
+        const SizedBox(height: 12),
+        _InfoItem(
+          label: 'Features Count',
+          value: '${kmlData.featuresCount}',
+          labelStyle: labelStyle,
+          textStyle: textStyle,
+        ),
+        const SizedBox(height: 12),
+        _InfoItem(
+          label: 'Layers Count',
+          value: '${kmlData.layersCount}',
+          labelStyle: labelStyle,
+          textStyle: textStyle,
+        ),
+        const SizedBox(height: 12),
+        _InfoItem(
+          label: 'Coordinate System',
+          value: kmlData.coordinateSystem.value,
+          labelStyle: labelStyle,
+          textStyle: textStyle,
+        ),
+        const SizedBox(height: 12),
+        _InfoItem(
+          label: 'Available Fields',
+          value: '${kmlData.availableFields.length}',
+          labelStyle: labelStyle,
+          textStyle: textStyle,
         ),
         if (kmlData.geometryTypeCounts.isNotEmpty) ...[
           const SizedBox(height: 12),
-          Text('Geometry Types:', style: labelStyle),
-          const SizedBox(height: 4),
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            children:
-                kmlData.geometryTypeCounts.entries.map<Widget>((entry) {
-                  return Chip(
-                    label: Text('${entry.key}: ${entry.value}'),
-                    backgroundColor:
-                        Theme.of(context).colorScheme.surfaceVariant,
-                  );
-                }).toList(),
+          _GeometryTypesSection(
+            geometryTypeCounts: kmlData.geometryTypeCounts,
+            labelStyle: labelStyle,
+            textStyle: textStyle,
           ),
         ],
       ],
@@ -149,12 +122,57 @@ class _InfoItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: labelStyle),
-        const SizedBox(height: 2),
-        Text(value, style: textStyle),
+        Expanded(flex: 1, child: Text('$label:', style: labelStyle)),
+        const SizedBox(width: 12),
+        Expanded(
+          flex: 3,
+          child: Text(
+            value,
+            style: textStyle,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 2,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _GeometryTypesSection extends StatelessWidget {
+  final Map<String, int> geometryTypeCounts;
+  final TextStyle? labelStyle;
+  final TextStyle? textStyle;
+
+  const _GeometryTypesSection({
+    required this.geometryTypeCounts,
+    this.labelStyle,
+    this.textStyle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Create a formatted string of all geometry types
+    final geometryTypesText = geometryTypeCounts.entries
+        .map((entry) => '${entry.key}: ${entry.value}')
+        .join(', ');
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(flex: 1, child: Text('Geometry Types:', style: labelStyle)),
+        const SizedBox(width: 12),
+        Expanded(
+          flex: 3,
+          child: Text(
+            geometryTypesText,
+            style: textStyle,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 2,
+          ),
+        ),
       ],
     );
   }

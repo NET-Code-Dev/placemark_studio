@@ -8,7 +8,7 @@ class PlacemarkStudioApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Placemark Studio',
+      title: 'Placemark Studio - KML Converter',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

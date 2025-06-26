@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:window_manager/window_manager.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 import 'package:file_picker/file_picker.dart';
@@ -58,6 +60,64 @@ class HomeViewModel extends BaseViewModel {
   List<ExportFormat> get supportedFormats =>
       ExportFormat.values.where((f) => f.isSupported).toList();
 
+  Future<void> _updateWindowTitle([String? fileName]) async {
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      String title = 'Placemark Studio';
+
+      if (fileName != null) {
+        title = 'Placemark Studio - KML Converter - $fileName';
+      } else if (_selectedFile != null) {
+        final currentFileName = path.basename(_selectedFile!.path);
+        title = 'Placemark Studio - KML Converter - $currentFileName';
+      }
+
+      await windowManager.setTitle(title);
+    }
+  }
+
+  Future<void> _enterFullscreenMode() async {
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      try {
+        // Option 1: True fullscreen (hides taskbar)
+        // await windowManager.setFullScreen(true);
+
+        // Option 2: Maximized window (keeps taskbar visible) - comment out line above and uncomment below
+        await windowManager.maximize();
+
+        // Update minimum size for fullscreen mode
+        await windowManager.setMinimumSize(const Size(1200, 800));
+      } catch (e) {
+        if (kDebugMode) {
+          print('Failed to enter fullscreen: $e');
+        }
+        // Fallback to maximize if fullscreen fails
+        await windowManager.maximize();
+      }
+    }
+  }
+
+  Future<void> _exitFullscreenMode() async {
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      try {
+        // Exit fullscreen
+        await windowManager.setFullScreen(false);
+
+        // Restore original size
+        await windowManager.setSize(const Size(800, 600));
+        await windowManager.center();
+
+        // Reset minimum size
+        await windowManager.setMinimumSize(const Size(800, 600));
+      } catch (e) {
+        if (kDebugMode) {
+          print('Failed to exit fullscreen: $e');
+        }
+        // Fallback to unmaximize
+        await windowManager.unmaximize();
+      }
+    }
+  }
+
   Future<void> pickFile() async {
     try {
       clearError();
@@ -68,6 +128,11 @@ class HomeViewModel extends BaseViewModel {
 
       if (file != null) {
         _selectedFile = file;
+
+        // Update title and enter fullscreen
+        final fileName = path.basename(file.path);
+        await _updateWindowTitle(fileName);
+        await _enterFullscreenMode();
 
         // Automatically parse the KML file and generate preview
         await _parseAndPreview();
@@ -80,6 +145,78 @@ class HomeViewModel extends BaseViewModel {
       setError(e.message, e);
     } catch (e) {
       setError('Failed to select file: ${e.toString()}');
+    }
+  }
+
+  Future<void> handleDroppedFile(File file) async {
+    try {
+      clearError();
+      _successMessage = null;
+
+      // Validate file before setting it
+      await _validateDroppedFile(file);
+
+      setLoading();
+      _selectedFile = file;
+
+      // Update title and enter fullscreen
+      final fileName = path.basename(file.path);
+      await _updateWindowTitle(fileName);
+      await _enterFullscreenMode();
+
+      // Automatically parse the KML file and generate preview
+      await _parseAndPreview();
+
+      setSuccess();
+    } on AppException catch (e) {
+      setError(e.message, e);
+    } catch (e) {
+      setError('Failed to process dropped file: ${e.toString()}');
+    }
+  }
+
+  Future<void> _validateDroppedFile(File file) async {
+    // Check if file exists
+    if (!await file.exists()) {
+      throw FileProcessingException(
+        'Dropped file does not exist',
+        code: 'FILE_NOT_FOUND',
+      );
+    }
+
+    // Check file extension
+    final extension = file.path.split('.').last.toLowerCase();
+    if (!AppConstants.supportedFileExtensions.contains(extension)) {
+      throw FileProcessingException(
+        'Unsupported file format. Only KML files are supported.',
+        code: 'UNSUPPORTED_FORMAT',
+      );
+    }
+
+    // Check file size
+    final stat = await file.stat();
+    if (stat.size > AppConstants.maxFileSizeBytes) {
+      throw FileProcessingException(
+        'File size exceeds maximum allowed size of ${AppConstants.maxFileSizeBytes / (1024 * 1024)}MB',
+        code: 'FILE_TOO_LARGE',
+      );
+    }
+
+    // Basic KML content validation
+    try {
+      final content = await file.readAsString();
+      if (!content.trim().startsWith('<?xml') || !content.contains('<kml')) {
+        throw FileProcessingException(
+          'Invalid KML file format',
+          code: 'INVALID_KML_FORMAT',
+        );
+      }
+    } catch (e) {
+      if (e is FileProcessingException) rethrow;
+      throw FileProcessingException(
+        'Unable to read file content',
+        code: 'FILE_READ_ERROR',
+      );
     }
   }
 
@@ -401,6 +538,10 @@ class HomeViewModel extends BaseViewModel {
     _duplicateHandling.clear();
     _separateLayers = false;
     clearError();
+
+    // Exit fullscreen and reset title
+    _exitFullscreenMode();
+    _updateWindowTitle();
   }
 
   void clearMessages() {

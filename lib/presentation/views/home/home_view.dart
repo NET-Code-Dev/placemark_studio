@@ -66,7 +66,7 @@ class _HomeViewContent extends StatelessWidget {
             children: [
               // Status messages (always at top)
               const Padding(
-                padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 0),
                 child: StatusMessageCard(),
               ),
 
@@ -109,14 +109,32 @@ class _DataLoadedView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // First row: File info and bounding box
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(flex: 1, child: FileInfoPanel()),
-              const SizedBox(width: 16),
-              Expanded(flex: 1, child: BoundingBoxPreview()),
-            ],
+          // First row: Left column (File Info + Export Options) and Right (Bounding Box)
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Left column: File Info and Export Options stacked
+                Expanded(
+                  flex: 1, // 1/3 width for the left column
+                  child: Column(
+                    children: [
+                      FileInfoPanel(),
+                      const SizedBox(
+                        height: 16,
+                      ), // Spacing between the two panels
+                      ExportOptionsPanel(),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16), // Spacing between left and right
+                // Right side: Bounding Box Preview (full height)
+                Expanded(
+                  flex: 2, // 2/3 width for bounding box
+                  child: BoundingBoxPreview(),
+                ),
+              ],
+            ),
           ),
 
           const SizedBox(height: 16),
@@ -125,22 +143,6 @@ class _DataLoadedView extends StatelessWidget {
           const SizedBox(
             height: 400, // Fixed height for better layout control
             child: PreviewTable(),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Third row: Export options
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(flex: 2, child: ExportOptionsPanel()),
-              const SizedBox(width: 16),
-              // Optional: Add another panel here if needed in the future
-              Expanded(
-                flex: 1,
-                child: Container(), // Empty for now
-              ),
-            ],
           ),
         ],
       ),
