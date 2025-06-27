@@ -1,7 +1,7 @@
 name: placemark_studio
 description: "A KML data manipulation studio"
 publish_to: 'none'
-version: 0.1.0
+version: 1.0.0
 
 environment:
   sdk: ^3.7.2
@@ -42,6 +42,7 @@ dev_dependencies:
   injectable_generator: ^2.4.1
   auto_route_generator: ^7.3.2
   json_annotation: ^4.9.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
@@ -57,3 +58,18 @@ fonts:
         weight: 600
       - asset: assets/fonts/Inter-Bold.ttf
         weight: 700
+
+flutter_icons:
+  android: false  # Since you're desktop-only
+  ios: false     # Since you're desktop-only
+  image_path: "assets/icon/placemarkstudio_icon.png"  # Path to your icon
+  windows:
+    generate: true
+    image_path: "assets/icon/placemarkstudio_icon.png"
+    icon_size: 48
+  macos:
+    generate: true
+    image_path: "assets/icon/placemarkstudio_icon.png"
+  linux:
+    generate: true
+    image_path: "assets/icon/placemarkstudio_icon.png"

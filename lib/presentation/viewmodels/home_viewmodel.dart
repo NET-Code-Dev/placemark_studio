@@ -106,12 +106,29 @@ class HomeViewModel extends BaseViewModel {
   Future<void> _exitFullscreenMode() async {
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       try {
-        // Exit fullscreen
-        await windowManager.setFullScreen(false);
+        // Check if we're currently in fullscreen or maximized
+        final isMaximized = await windowManager.isMaximized();
+        final isFullScreen = await windowManager.isFullScreen();
 
-        // Restore original size
-        await windowManager.setSize(const Size(800, 600));
-        await windowManager.center();
+        if (isFullScreen) {
+          // Exit fullscreen
+          await windowManager.setFullScreen(false);
+        }
+
+        if (isMaximized) {
+          // Unmaximize if maximized
+          await windowManager.unmaximize();
+        }
+
+        // Only resize if we were actually in fullscreen/maximized mode
+        if (isFullScreen || isMaximized) {
+          // Small delay to ensure fullscreen/maximize state has changed
+          await Future.delayed(const Duration(milliseconds: 100));
+
+          // Restore original size and center
+          await windowManager.setSize(const Size(800, 600));
+          await windowManager.center();
+        }
 
         // Reset minimum size
         await windowManager.setMinimumSize(const Size(800, 600));
@@ -119,8 +136,14 @@ class HomeViewModel extends BaseViewModel {
         if (kDebugMode) {
           print('Failed to exit fullscreen: $e');
         }
-        // Fallback to unmaximize
-        await windowManager.unmaximize();
+        // Fallback: just try to unmaximize
+        try {
+          await windowManager.unmaximize();
+        } catch (e2) {
+          if (kDebugMode) {
+            print('Fallback unmaximize also failed: $e2');
+          }
+        }
       }
     }
   }
@@ -884,16 +907,30 @@ class HomeViewModel extends BaseViewModel {
     _duplicateHeaders = null;
     _duplicateHandling.clear();
     _separateLayers = false;
-    _useSimpleFileNaming = false; // Add this line
+    _useSimpleFileNaming = false;
     clearError();
 
-    // Exit fullscreen and reset title
-    _exitFullscreenMode();
-    _updateWindowTitle();
+    // Exit fullscreen and reset title asynchronously without waiting
+    _exitFullscreenMode()
+        .then((_) {
+          // Update title after exiting fullscreen
+          _updateWindowTitle();
+        })
+        .catchError((e) {
+          if (kDebugMode) {
+            print('Error during window state reset: $e');
+          }
+          // Still update the title even if window operations fail
+          _updateWindowTitle();
+        });
+
+    // Notify listeners immediately to update the UI
+    notifyListeners();
   }
 
   void clearMessages() {
     _successMessage = null;
     clearError();
+    notifyListeners(); // Add this line to update the UI
   }
 }
