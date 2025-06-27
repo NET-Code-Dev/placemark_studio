@@ -1,5 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:placemark_studio/core/utils/folder_file_naming_helper.dart';
+import 'package:placemark_studio/data/models/bounding_box.dart';
+import 'package:placemark_studio/data/models/kml_folder.dart';
+import 'package:placemark_studio/data/models/placemark.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
@@ -37,6 +41,7 @@ class HomeViewModel extends BaseViewModel {
   Map<String, List<String>>? _duplicateHeaders;
   final Map<String, bool> _duplicateHandling = {};
   bool _separateLayers = false;
+  bool _useSimpleFileNaming = false;
 
   // Getters
   File? get selectedFile => _selectedFile;
@@ -55,6 +60,7 @@ class HomeViewModel extends BaseViewModel {
   bool get hasPreviewData => _previewData != null;
   bool get hasDuplicateHeaders => _duplicateHeaders?.isNotEmpty ?? false;
   bool get hasOutputPath => _outputPath != null;
+  bool get useSimpleFileNaming => _useSimpleFileNaming;
   String? get selectedFileName =>
       _selectedFile != null ? path.basename(_selectedFile!.path) : null;
 
@@ -306,6 +312,13 @@ class HomeViewModel extends BaseViewModel {
     }
   }
 
+  void setUseSimpleFileNaming(bool useSimple) {
+    if (_useSimpleFileNaming != useSimple) {
+      _useSimpleFileNaming = useSimple;
+      notifyListeners();
+    }
+  }
+
   Future<void> selectOutputPath() async {
     try {
       String? outputDirectory = await FilePicker.platform.getDirectoryPath();
@@ -393,6 +406,7 @@ class HomeViewModel extends BaseViewModel {
     _successMessage = 'File converted successfully!\nSaved to: $outputFilePath';
   }
 
+  /*
   Future<void> _convertToSeparateFiles() async {
     // Determine output directory
     String outputDirectory;
@@ -438,9 +452,327 @@ class HomeViewModel extends BaseViewModel {
         'Created ${filesCreated.length} files in: $folderPath\n'
         'Files: ${filesCreated.join(', ')}';
   }
+*/
+  Future<void> _convertToSeparateFiles() async {
+    if (_kmlData == null) {
+      throw ConversionException('No KML data available for conversion');
+    }
+
+    // Determine output directory
+    String outputDirectory;
+    if (_outputPath != null) {
+      outputDirectory = _outputPath!;
+    } else {
+      outputDirectory = path.dirname(_selectedFile!.path);
+    }
+
+    // Create folder for separate files
+    final baseName = path.basenameWithoutExtension(_selectedFile!.path);
+    final timestamp = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final folderName =
+        _kmlData!.hasHierarchy
+            ? '${baseName}_folders_$timestamp'
+            : '${baseName}_layers_$timestamp';
+    final folderPath = path.join(outputDirectory, folderName);
+    final folder = Directory(folderPath);
+
+    if (!await folder.exists()) {
+      await folder.create(recursive: true);
+    }
+
+    final filesCreated = <String>[];
+    final exportSummary = <String, int>{};
+
+    try {
+      if (_kmlData!.hasHierarchy) {
+        // Handle hierarchical structure
+        await _exportHierarchicalStructure(
+          _kmlData!.folderStructure!,
+          folderPath,
+          filesCreated,
+          exportSummary,
+        );
+      } else {
+        // Handle flat structure (fallback)
+        await _exportFlatStructure(folderPath, filesCreated, exportSummary);
+      }
+
+      // Generate success message with detailed info
+      _successMessage = _generateExportSuccessMessage(
+        folderPath,
+        filesCreated,
+        exportSummary,
+      );
+    } catch (e) {
+      // Clean up folder if export failed
+      if (await folder.exists() && filesCreated.isEmpty) {
+        await folder.delete(recursive: true);
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> _exportHierarchicalStructure(
+    KmlFolder rootFolder,
+    String outputPath,
+    List<String> filesCreated,
+    Map<String, int> exportSummary,
+  ) async {
+    // Build folder counts for better naming
+    final folderCounts = FolderFileNamingHelper.buildFolderCountMap(rootFolder);
+
+    // Recursively export each folder that has placemarks
+    await _exportFolderRecursively(
+      rootFolder,
+      outputPath,
+      filesCreated,
+      exportSummary,
+      folderCounts,
+      rootFolder, // Pass root folder reference
+    );
+
+    // Export summary statistics
+    exportSummary['total_folders_processed'] = _countFoldersWithPlacemarks(
+      rootFolder,
+    );
+    exportSummary['max_depth'] = rootFolder.getMaxDepth();
+    exportSummary['total_placemarks'] = rootFolder.getTotalPlacemarkCount();
+  }
+
+  Future<void> _exportFolderRecursively(
+    KmlFolder folder,
+    String outputPath,
+    List<String> filesCreated,
+    Map<String, int> exportSummary,
+    Map<String, int> folderCounts,
+    KmlFolder rootFolder, {
+    String currentPath = '',
+  }) async {
+    // Generate the proper hierarchical path for this folder
+    final hierarchicalPath =
+        currentPath.isEmpty
+            ? folder.name
+            : FolderFileNamingHelper.generatePathFromContext(
+              folder,
+              currentPath,
+            );
+
+    // Export this folder if it has placemarks
+    if (folder.placemarks.isNotEmpty) {
+      try {
+        final fileName = FolderFileNamingHelper.generateFileName(
+          folder,
+          _selectedExportFormat.extension,
+          parentPath: hierarchicalPath,
+          folderCounts: folderCounts,
+          useSimpleNaming: _useSimpleFileNaming, // Add this parameter
+        );
+
+        if (kDebugMode) {
+          print(
+            'Exporting folder: "${folder.name}" at path "$hierarchicalPath" -> "$fileName"',
+          );
+        }
+
+        final filePath = path.join(outputPath, fileName);
+
+        // Create a filtered KmlData containing only this folder's placemarks
+        final filteredKmlData = _createFilteredKmlData(folder.placemarks);
+
+        // Export this specific folder
+        await _exportSpecificFolder(filteredKmlData, filePath);
+
+        filesCreated.add(fileName);
+
+        // Update statistics
+        final key = 'depth_${folder.depth}';
+        exportSummary[key] = (exportSummary[key] ?? 0) + 1;
+        exportSummary['total_placemarks_exported'] =
+            (exportSummary['total_placemarks_exported'] ?? 0) +
+            folder.placemarks.length;
+      } catch (e) {
+        if (kDebugMode) {
+          print('Error exporting folder "${folder.name}": $e');
+          print('Folder depth: ${folder.depth}');
+          print('Placemarks count: ${folder.placemarks.length}');
+          print('Hierarchical path: "$hierarchicalPath"');
+        }
+        rethrow; // Re-throw to see the full error in the UI
+      }
+    }
+
+    // Recursively process subfolders
+    for (final subFolder in folder.subFolders) {
+      await _exportFolderRecursively(
+        subFolder,
+        outputPath,
+        filesCreated,
+        exportSummary,
+        folderCounts,
+        rootFolder,
+        currentPath: hierarchicalPath,
+      );
+    }
+  }
+
+  Future<void> _exportFlatStructure(
+    String outputPath,
+    List<String> filesCreated,
+    Map<String, int> exportSummary,
+  ) async {
+    // For flat structures, split placemarks evenly across files
+    final layerCount = _kmlData!.layersCount;
+    final placemarks = _kmlData!.placemarks;
+    final placemarksPerLayer = (placemarks.length / layerCount).ceil();
+
+    for (int i = 0; i < layerCount; i++) {
+      final startIndex = i * placemarksPerLayer;
+      final endIndex = ((i + 1) * placemarksPerLayer).clamp(
+        0,
+        placemarks.length,
+      );
+
+      if (startIndex >= placemarks.length) break;
+
+      final layerPlacemarks = placemarks.sublist(startIndex, endIndex);
+      final fileName =
+          'layer_${(i + 1).toString().padLeft(2, '0')}${_selectedExportFormat.extension}';
+      final filePath = path.join(outputPath, fileName);
+
+      try {
+        final filteredKmlData = _createFilteredKmlData(layerPlacemarks);
+        await _exportSpecificFolder(filteredKmlData, filePath);
+
+        filesCreated.add(fileName);
+        exportSummary['layer_${i + 1}'] = layerPlacemarks.length;
+      } catch (e) {
+        if (kDebugMode) {
+          print('Warning: Failed to export layer ${i + 1}: $e');
+        }
+      }
+    }
+
+    exportSummary['total_layers'] = layerCount;
+    exportSummary['total_placemarks'] = placemarks.length;
+  }
+
+  KmlData _createFilteredKmlData(List<Placemark> placemarks) {
+    // Create a new KmlData with only the specified placemarks
+    final allCoordinates =
+        placemarks.expand((p) => p.geometry.coordinates).toList();
+
+    final boundingBox =
+        allCoordinates.isNotEmpty
+            ? BoundingBox.fromCoordinates(allCoordinates)
+            : _kmlData!.boundingBox;
+
+    // Extract available fields from these placemarks
+    final fields = <String>{
+      'name',
+      'description',
+      'longitude',
+      'latitude',
+      'elevation',
+    };
+    for (final placemark in placemarks) {
+      fields.addAll(placemark.extendedData.keys);
+      // Add fields from description tables if needed
+      // This could be enhanced to parse description tables
+    }
+
+    return _kmlData!.copyWith(
+      placemarks: placemarks,
+      boundingBox: boundingBox,
+      availableFields: fields,
+    );
+  }
+
+  Future<void> _exportSpecificFolder(
+    KmlData filteredData,
+    String filePath,
+  ) async {
+    // Temporarily swap the current KmlData
+    final originalKmlData = _kmlData;
+    _kmlData = filteredData;
+
+    try {
+      // Create export options
+      final exportOptions = ExportOptions(
+        format: _selectedExportFormat,
+        outputPath: filePath,
+      );
+
+      // Export using the existing method
+      await _exportToCsv(exportOptions, filePath);
+    } finally {
+      // Restore original KmlData
+      _kmlData = originalKmlData;
+    }
+  }
+
+  int _countFoldersWithPlacemarks(KmlFolder folder) {
+    int count = folder.placemarks.isNotEmpty ? 1 : 0;
+    for (final subFolder in folder.subFolders) {
+      count += _countFoldersWithPlacemarks(subFolder);
+    }
+    return count;
+  }
+
+  String _generateExportSuccessMessage(
+    String folderPath,
+    List<String> filesCreated,
+    Map<String, int> exportSummary,
+  ) {
+    final buffer = StringBuffer();
+    buffer.writeln('Files converted successfully!');
+    buffer.writeln('Output folder: ${path.basename(folderPath)}');
+    buffer.writeln('');
+
+    if (_kmlData!.hasHierarchy) {
+      buffer.writeln('📁 Hierarchical Export Summary:');
+      buffer.writeln('• Files created: ${filesCreated.length}');
+      buffer.writeln(
+        '• Folders processed: ${exportSummary['total_folders_processed'] ?? 0}',
+      );
+      buffer.writeln('• Max depth: ${exportSummary['max_depth'] ?? 0} levels');
+      buffer.writeln(
+        '• Total placemarks: ${exportSummary['total_placemarks_exported'] ?? 0}',
+      );
+
+      // Show depth distribution
+      final depthStats = <String>[];
+      for (int i = 0; i <= (exportSummary['max_depth'] ?? 0); i++) {
+        final count = exportSummary['depth_$i'] ?? 0;
+        if (count > 0) {
+          depthStats.add('L$i: $count files');
+        }
+      }
+      if (depthStats.isNotEmpty) {
+        buffer.writeln('• By depth: ${depthStats.join(', ')}');
+      }
+    } else {
+      buffer.writeln('📄 Layer Export Summary:');
+      buffer.writeln('• Files created: ${filesCreated.length}');
+      buffer.writeln('• Total layers: ${exportSummary['total_layers'] ?? 0}');
+      buffer.writeln(
+        '• Total placemarks: ${exportSummary['total_placemarks'] ?? 0}',
+      );
+    }
+
+    buffer.writeln('');
+    if (filesCreated.length <= 5) {
+      buffer.writeln('Files: ${filesCreated.join(', ')}');
+    } else {
+      buffer.writeln(
+        'Sample files: ${filesCreated.take(3).join(', ')}, ... and ${filesCreated.length - 3} more',
+      );
+    }
+
+    return buffer.toString();
+  }
 
   Future<void> _exportToCsv(ExportOptions options, String outputPath) async {
-    // Export to CSV content with duplicate handling
+    // Use the current KmlData (which might be filtered for a specific folder)
     final headers = _csvExportService.buildHeadersWithDuplicates(
       _kmlData!,
       _duplicateHandling,
@@ -455,8 +787,10 @@ class HomeViewModel extends BaseViewModel {
     // Save CSV file
     await _csvExportService.saveCsvFile(csvContent, outputPath);
 
-    // Update preview with final data
-    _generatePreviewData(csvContent);
+    // Don't update preview for individual files in batch export
+    if (!outputPath.contains('_layers/')) {
+      _generatePreviewData(csvContent);
+    }
   }
 
   // Legacy method for backward compatibility
@@ -550,6 +884,7 @@ class HomeViewModel extends BaseViewModel {
     _duplicateHeaders = null;
     _duplicateHandling.clear();
     _separateLayers = false;
+    _useSimpleFileNaming = false; // Add this line
     clearError();
 
     // Exit fullscreen and reset title

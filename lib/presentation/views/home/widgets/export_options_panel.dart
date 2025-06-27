@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:placemark_studio/data/models/kml_folder.dart';
 import 'package:provider/provider.dart';
 import '../../../viewmodels/home_viewmodel.dart';
 import '../../../../core/enums/export_format.dart';
@@ -27,6 +28,8 @@ class ExportOptionsPanel extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 _LayerSeparationOption(),
+                const SizedBox(height: 16),
+                _FileNamingOption(), // Add the file naming option
                 const SizedBox(height: 16),
                 // Row for Export Format and Output Location
                 Row(
@@ -126,6 +129,10 @@ class _LayerSeparationOption extends StatelessWidget {
         final hasHierarchy = kmlData.hasHierarchy;
         final folderCount =
             hasHierarchy ? kmlData.totalFolderCount : kmlData.layersCount;
+        final layersWithData =
+            hasHierarchy
+                ? _countFoldersWithPlacemarks(kmlData.folderStructure!)
+                : kmlData.layersCount;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -264,7 +271,7 @@ class _LayerSeparationOption extends StatelessWidget {
                                   ),
                                   Text(
                                     hasHierarchy
-                                        ? 'Preserve folder structure'
+                                        ? 'Create ${layersWithData} files'
                                         : 'Each layer in own file',
                                     style: Theme.of(context).textTheme.bodySmall
                                         ?.copyWith(color: Colors.grey[600]),
@@ -280,44 +287,158 @@ class _LayerSeparationOption extends StatelessWidget {
                 ],
               ),
             ),
-            if (viewModel.separateLayers && folderCount > 1) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: hasHierarchy ? Colors.green[50] : Colors.blue[50],
-                  border: Border.all(
-                    color:
-                        hasHierarchy ? Colors.green[200]! : Colors.blue[200]!,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      hasHierarchy ? Icons.account_tree : Icons.info_outline,
-                      color:
-                          hasHierarchy ? Colors.green[700] : Colors.blue[700],
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        hasHierarchy
-                            ? 'Will create ${folderCount} files maintaining the original folder structure with up to ${kmlData.maxFolderDepth} nesting levels'
-                            : 'Will create ${folderCount} separate files in a new folder',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color:
-                              hasHierarchy
-                                  ? Colors.green[700]
-                                  : Colors.blue[700],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _FileNamingOption extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<HomeViewModel>(
+      builder: (context, viewModel, child) {
+        // Only show this option when separate layers is enabled and we have hierarchy
+        if (!viewModel.separateLayers || !viewModel.kmlData!.hasHierarchy) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'File Naming Style',
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+            const SizedBox(height: 8),
+            // Horizontal row layout like Layer Output
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey[300]!),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.all(8),
+              child: Row(
+                children: [
+                  // Smart naming option
+                  Expanded(
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        onTap: () => viewModel.setUseSimpleFileNaming(false),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color:
+                                !viewModel.useSimpleFileNaming
+                                    ? Theme.of(
+                                      context,
+                                    ).colorScheme.primary.withOpacity(0.1)
+                                    : null,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            children: [
+                              Radio<bool>(
+                                value: false,
+                                groupValue: viewModel.useSimpleFileNaming,
+                                onChanged: (value) {
+                                  if (value != null) {
+                                    viewModel.setUseSimpleFileNaming(value);
+                                  }
+                                },
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Smart naming',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Uses folder path',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(color: Colors.grey[600]),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Simple naming option
+                  Expanded(
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        onTap: () => viewModel.setUseSimpleFileNaming(true),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color:
+                                viewModel.useSimpleFileNaming
+                                    ? Theme.of(
+                                      context,
+                                    ).colorScheme.primary.withOpacity(0.1)
+                                    : null,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            children: [
+                              Radio<bool>(
+                                value: true,
+                                groupValue: viewModel.useSimpleFileNaming,
+                                onChanged: (value) {
+                                  if (value != null) {
+                                    viewModel.setUseSimpleFileNaming(value);
+                                  }
+                                },
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Simple naming',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Folder name only',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(color: Colors.grey[600]),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ],
         );
       },
@@ -415,11 +536,32 @@ class _SimplifiedDuplicateHeadersPanel extends StatelessWidget {
                     context,
                   ).textTheme.labelLarge?.copyWith(color: Colors.orange[700]),
                 ),
+                const SizedBox(width: 8),
+                // Add count badge
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.orange[100],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${duplicates.length}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.orange[800],
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 8),
             Container(
-              padding: const EdgeInsets.all(12),
+              height: 105, // Fixed height for scrollable area
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: Colors.orange[50],
                 border: Border.all(color: Colors.orange[200]!),
@@ -429,25 +571,34 @@ class _SimplifiedDuplicateHeadersPanel extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'The following headers appear multiple times:',
+                    'Click to toggle inclusion (${duplicates.values.expand((v) => v).length} total occurrences):',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children:
-                        duplicates.entries.map((entry) {
-                          return _DuplicateHeaderChip(
-                            header: entry.key,
-                            sources: entry.value,
-                            isEnabled:
-                                viewModel.duplicateHandling[entry.key] ?? true,
-                            onChanged: (value) {
-                              viewModel.setDuplicateHandling(entry.key, value);
-                            },
-                          );
-                        }).toList(),
+                  // Scrollable area for chips
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children:
+                            duplicates.entries.map((entry) {
+                              return _DuplicateHeaderChip(
+                                header: entry.key,
+                                sources: entry.value,
+                                isEnabled:
+                                    viewModel.duplicateHandling[entry.key] ??
+                                    true,
+                                onChanged: (value) {
+                                  viewModel.setDuplicateHandling(
+                                    entry.key,
+                                    value,
+                                  );
+                                },
+                              );
+                            }).toList(),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -570,4 +721,14 @@ class _DuplicateHeaderChip extends StatelessWidget {
           ),
     );
   }
+}
+
+int _countFoldersWithPlacemarks(KmlFolder folder) {
+  int count = folder.placemarks.isNotEmpty ? 1 : 0;
+
+  for (final subFolder in folder.subFolders) {
+    count += _countFoldersWithPlacemarks(subFolder);
+  }
+
+  return count;
 }

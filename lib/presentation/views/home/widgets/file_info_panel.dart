@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:placemark_studio/data/models/kml_folder.dart';
 import 'package:provider/provider.dart';
 import '../../../viewmodels/home_viewmodel.dart';
 import '../../../../core/utils/file_utils.dart';
@@ -102,41 +103,19 @@ class _InfoColumn extends StatelessWidget {
                   labelStyle: labelStyle,
                   textStyle: textStyle,
                 ),
-                const SizedBox(height: 12),
-                _InfoItem(
-                  label: 'Features Count',
-                  value: '${kmlData.featuresCount}',
-                  labelStyle: labelStyle,
-                  textStyle: textStyle,
-                ),
-                const SizedBox(height: 12),
-                _InfoItem(
-                  label: 'Coordinate System',
-                  value: kmlData.coordinateSystem.value,
-                  labelStyle: labelStyle,
-                  textStyle: textStyle,
-                ),
-                const SizedBox(height: 12),
-                _InfoItem(
-                  label: 'Available Fields',
-                  value: '${kmlData.availableFields.length}',
-                  labelStyle: labelStyle,
-                  textStyle: textStyle,
-                ),
-                if (kmlData.geometryTypeCounts.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  _GeometryTypesSection(
-                    geometryTypeCounts: kmlData.geometryTypeCounts,
-                    labelStyle: labelStyle,
-                    textStyle: textStyle,
-                  ),
-                ],
-                // Add folder count info for hierarchy files
                 if (kmlData.hasHierarchy) ...[
                   const SizedBox(height: 12),
                   _InfoItem(
                     label: 'Total Folders',
                     value: '${kmlData.totalFolderCount}',
+                    labelStyle: labelStyle,
+                    textStyle: textStyle,
+                  ),
+                  const SizedBox(height: 12),
+                  _InfoItem(
+                    label: 'Folders with Data',
+                    value:
+                        '${_countFoldersWithPlacemarks(kmlData.folderStructure!)}',
                     labelStyle: labelStyle,
                     textStyle: textStyle,
                   ),
@@ -156,6 +135,35 @@ class _InfoColumn extends StatelessWidget {
                     textStyle: textStyle,
                   ),
                 ],
+                if (kmlData.geometryTypeCounts.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _GeometryTypesSection(
+                    geometryTypeCounts: kmlData.geometryTypeCounts,
+                    labelStyle: labelStyle,
+                    textStyle: textStyle,
+                  ),
+                ],
+                const SizedBox(height: 12),
+                _InfoItem(
+                  label: 'Available Fields',
+                  value: '${kmlData.availableFields.length}',
+                  labelStyle: labelStyle,
+                  textStyle: textStyle,
+                ),
+                const SizedBox(height: 12),
+                _InfoItem(
+                  label: 'Features Count',
+                  value: '${kmlData.featuresCount}',
+                  labelStyle: labelStyle,
+                  textStyle: textStyle,
+                ),
+                const SizedBox(height: 12),
+                _InfoItem(
+                  label: 'Coordinate System',
+                  value: kmlData.coordinateSystem.value,
+                  labelStyle: labelStyle,
+                  textStyle: textStyle,
+                ),
               ],
             ),
           ),
@@ -396,4 +404,14 @@ class _GeometryTypesSection extends StatelessWidget {
       ],
     );
   }
+}
+
+int _countFoldersWithPlacemarks(KmlFolder folder) {
+  int count = folder.placemarks.isNotEmpty ? 1 : 0;
+
+  for (final subFolder in folder.subFolders) {
+    count += _countFoldersWithPlacemarks(subFolder);
+  }
+
+  return count;
 }
