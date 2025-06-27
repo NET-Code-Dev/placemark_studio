@@ -57,7 +57,7 @@ class _PreviewTableState extends State<PreviewTable> {
 
         return Card(
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -77,7 +77,7 @@ class _PreviewTableState extends State<PreviewTable> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
 
                 // Scrollable table with both horizontal and vertical scrollbars
                 Expanded(
@@ -101,7 +101,7 @@ class _PreviewTableState extends State<PreviewTable> {
                               children: [
                                 // Header row
                                 Container(
-                                  height: 48,
+                                  height: 35,
                                   decoration: BoxDecoration(
                                     color:
                                         Theme.of(
@@ -131,7 +131,7 @@ class _PreviewTableState extends State<PreviewTable> {
                                   child: ListView.builder(
                                     controller: _verticalController,
                                     itemCount: rows.length,
-                                    itemExtent: 40,
+                                    itemExtent: 30,
                                     itemBuilder: (context, rowIndex) {
                                       final row = rows[rowIndex];
                                       return Container(
@@ -183,8 +183,8 @@ class _PreviewTableState extends State<PreviewTable> {
                   ),
                 ),
 
-                const SizedBox(height: 8),
-
+                const SizedBox(height: 1),
+                /*
                 // Desktop-friendly instructions
                 Row(
                   children: [
@@ -198,6 +198,7 @@ class _PreviewTableState extends State<PreviewTable> {
                     ),
                   ],
                 ),
+*/
               ],
             ),
           ),

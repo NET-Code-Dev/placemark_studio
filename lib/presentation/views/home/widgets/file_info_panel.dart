@@ -30,7 +30,7 @@ class FileInfoPanel extends StatelessWidget {
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
                     if (kmlData.hasHierarchy) ...[
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 4),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -54,11 +54,7 @@ class FileInfoPanel extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 16),
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: _InfoColumn(kmlData: kmlData),
-                  ),
-                ),
+                Expanded(child: _InfoColumn(kmlData: kmlData)),
               ],
             ),
           ),
@@ -81,88 +77,175 @@ class _InfoColumn extends StatelessWidget {
       color: Theme.of(context).colorScheme.onSurfaceVariant,
     );
 
-    return Column(
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _InfoItem(
-          label: 'File Name',
-          value: kmlData.fileName,
-          labelStyle: labelStyle,
-          textStyle: textStyle,
+        // Left Column - Basic File Information
+        Expanded(
+          flex: 1,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                /*
+                _InfoItem(
+                  label: 'File Name',
+                  value: kmlData.fileName,
+                  labelStyle: labelStyle,
+                  textStyle: textStyle,
+                ),
+                const SizedBox(height: 12),
+*/
+                _InfoItem(
+                  label: 'File Size',
+                  value: FileUtils.formatFileSize(kmlData.fileSize),
+                  labelStyle: labelStyle,
+                  textStyle: textStyle,
+                ),
+                const SizedBox(height: 12),
+                _InfoItem(
+                  label: 'Features Count',
+                  value: '${kmlData.featuresCount}',
+                  labelStyle: labelStyle,
+                  textStyle: textStyle,
+                ),
+                const SizedBox(height: 12),
+                _InfoItem(
+                  label: 'Coordinate System',
+                  value: kmlData.coordinateSystem.value,
+                  labelStyle: labelStyle,
+                  textStyle: textStyle,
+                ),
+                const SizedBox(height: 12),
+                _InfoItem(
+                  label: 'Available Fields',
+                  value: '${kmlData.availableFields.length}',
+                  labelStyle: labelStyle,
+                  textStyle: textStyle,
+                ),
+                if (kmlData.geometryTypeCounts.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _GeometryTypesSection(
+                    geometryTypeCounts: kmlData.geometryTypeCounts,
+                    labelStyle: labelStyle,
+                    textStyle: textStyle,
+                  ),
+                ],
+                // Add folder count info for hierarchy files
+                if (kmlData.hasHierarchy) ...[
+                  const SizedBox(height: 12),
+                  _InfoItem(
+                    label: 'Total Folders',
+                    value: '${kmlData.totalFolderCount}',
+                    labelStyle: labelStyle,
+                    textStyle: textStyle,
+                  ),
+                  const SizedBox(height: 12),
+                  _InfoItem(
+                    label: 'Max Nesting Depth',
+                    value: '${kmlData.maxFolderDepth} levels',
+                    labelStyle: labelStyle,
+                    textStyle: textStyle,
+                  ),
+                ] else ...[
+                  const SizedBox(height: 12),
+                  _InfoItem(
+                    label: 'Layers Count',
+                    value: '${kmlData.layersCount}',
+                    labelStyle: labelStyle,
+                    textStyle: textStyle,
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
-        const SizedBox(height: 12),
-        _InfoItem(
-          label: 'File Size',
-          value: FileUtils.formatFileSize(kmlData.fileSize),
-          labelStyle: labelStyle,
-          textStyle: textStyle,
-        ),
-        const SizedBox(height: 12),
-        _InfoItem(
-          label: 'Features Count',
-          value: '${kmlData.featuresCount}',
-          labelStyle: labelStyle,
-          textStyle: textStyle,
-        ),
-        const SizedBox(height: 12),
 
-        // Folder/Layer information
-        if (kmlData.hasHierarchy) ...[
-          _InfoItem(
-            label: 'Total Folders',
-            value: '${kmlData.totalFolderCount}',
-            labelStyle: labelStyle,
-            textStyle: textStyle,
+        const SizedBox(width: 16), // Spacing between columns
+        // Right Column - Folder Structure (only show if hierarchy exists)
+        if (kmlData.hasHierarchy)
+          Expanded(
+            flex: 2,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Folder Structure:',
+                  style:
+                      labelStyle ??
+                      Theme.of(context).textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: _HierarchyPreview(
+                    kmlData: kmlData,
+                    textStyle:
+                        textStyle ?? Theme.of(context).textTheme.bodyMedium,
+                    labelStyle:
+                        labelStyle ??
+                        Theme.of(context).textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          // If no hierarchy, show a placeholder
+          Expanded(
+            flex: 1,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Structure:',
+                  style:
+                      labelStyle ??
+                      Theme.of(context).textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.grey[300]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.description,
+                        size: 16,
+                        color: Colors.grey[600],
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Flat structure - no folders',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: Colors.grey[600]),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          _InfoItem(
-            label: 'Max Nesting Depth',
-            value: '${kmlData.maxFolderDepth} levels',
-            labelStyle: labelStyle,
-            textStyle: textStyle,
-          ),
-          const SizedBox(height: 12),
-          _HierarchyPreview(
-            kmlData: kmlData,
-            textStyle: textStyle,
-            labelStyle: labelStyle,
-          ),
-        ] else ...[
-          _InfoItem(
-            label: 'Layers Count',
-            value: '${kmlData.layersCount}',
-            labelStyle: labelStyle,
-            textStyle: textStyle,
-          ),
-        ],
-
-        const SizedBox(height: 12),
-        _InfoItem(
-          label: 'Coordinate System',
-          value: kmlData.coordinateSystem.value,
-          labelStyle: labelStyle,
-          textStyle: textStyle,
-        ),
-        const SizedBox(height: 12),
-        _InfoItem(
-          label: 'Available Fields',
-          value: '${kmlData.availableFields.length}',
-          labelStyle: labelStyle,
-          textStyle: textStyle,
-        ),
-        if (kmlData.geometryTypeCounts.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _GeometryTypesSection(
-            geometryTypeCounts: kmlData.geometryTypeCounts,
-            labelStyle: labelStyle,
-            textStyle: textStyle,
-          ),
-        ],
       ],
     );
   }
 }
 
-class _HierarchyPreview extends StatefulWidget {
+class _HierarchyPreview extends StatelessWidget {
   final KmlData kmlData;
   final TextStyle? textStyle;
   final TextStyle? labelStyle;
@@ -174,105 +257,78 @@ class _HierarchyPreview extends StatefulWidget {
   });
 
   @override
-  State<_HierarchyPreview> createState() => _HierarchyPreviewState();
-}
-
-class _HierarchyPreviewState extends State<_HierarchyPreview> {
-  bool _isExpanded = false;
-
-  @override
   Widget build(BuildContext context) {
-    if (!widget.kmlData.hasHierarchy) return const SizedBox.shrink();
+    if (!kmlData.hasHierarchy) return const SizedBox.shrink();
 
-    final folderPaths = widget.kmlData.folderStructure!.getAllFolderPaths();
-    final previewPaths =
-        _isExpanded ? folderPaths : folderPaths.take(3).toList();
+    final folderPaths = kmlData.folderStructure!.getAllFolderPaths();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Text('Folder Structure:', style: widget.labelStyle),
-            ),
-            if (folderPaths.length > 3)
-              GestureDetector(
-                onTap: () => setState(() => _isExpanded = !_isExpanded),
-                child: Text(
-                  _isExpanded
-                      ? 'Show Less'
-                      : 'Show All (${folderPaths.length})',
-                  style: widget.textStyle?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.grey[50],
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: Colors.grey[300]!),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ...previewPaths.map((path) {
-                final depth = path.split('/').length - 1;
-                final folderName = path.split('/').last;
-                final folder = widget.kmlData.findFolderByPath(path);
-                final placemarkCount = folder?.placemarks.length ?? 0;
+            ...folderPaths.map((path) {
+              final depth = path.split('/').length - 1;
+              final folderName = path.split('/').last;
+              final folder = kmlData.findFolderByPath(path);
+              final placemarkCount = folder?.placemarks.length ?? 0;
 
-                return Padding(
-                  padding: EdgeInsets.only(left: depth * 16.0, bottom: 4),
-                  child: Row(
-                    children: [
-                      Icon(
-                        depth == 0 ? Icons.folder_open : Icons.folder,
-                        size: 14,
-                        color: Colors.grey[600],
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          folderName,
-                          style: widget.textStyle?.copyWith(fontSize: 12),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (placemarkCount > 0)
-                        Text(
-                          '($placemarkCount)',
-                          style: widget.textStyle?.copyWith(
-                            fontSize: 11,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                    ],
-                  ),
-                );
-              }).toList(),
-              if (!_isExpanded && folderPaths.length > 3)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    '... and ${folderPaths.length - 3} more folders',
-                    style: widget.textStyle?.copyWith(
-                      fontSize: 11,
-                      fontStyle: FontStyle.italic,
+              return Padding(
+                padding: EdgeInsets.only(left: depth * 12.0, bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      depth == 0 ? Icons.folder_open : Icons.folder,
+                      size: 14,
                       color: Colors.grey[600],
                     ),
-                  ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        folderName,
+                        style: textStyle?.copyWith(
+                          fontSize: 12,
+                          fontWeight:
+                              depth == 0 ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 2,
+                      ),
+                    ),
+                    if (placemarkCount > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.blue[100],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '$placemarkCount',
+                          style: textStyle?.copyWith(
+                            fontSize: 10,
+                            color: Colors.blue[800],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-            ],
-          ),
+              );
+            }).toList(),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -292,19 +348,16 @@ class _InfoItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(flex: 1, child: Text('$label:', style: labelStyle)),
-        const SizedBox(width: 12),
-        Expanded(
-          flex: 3,
-          child: Text(
-            value,
-            style: textStyle,
-            overflow: TextOverflow.ellipsis,
-            maxLines: 2,
-          ),
+        Text('$label:', style: labelStyle),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: textStyle,
+          overflow: TextOverflow.ellipsis,
+          maxLines: 2,
         ),
       ],
     );
@@ -329,19 +382,16 @@ class _GeometryTypesSection extends StatelessWidget {
         .map((entry) => '${entry.key}: ${entry.value}')
         .join(', ');
 
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(flex: 1, child: Text('Geometry Types:', style: labelStyle)),
-        const SizedBox(width: 12),
-        Expanded(
-          flex: 3,
-          child: Text(
-            geometryTypesText,
-            style: textStyle,
-            overflow: TextOverflow.ellipsis,
-            maxLines: 2,
-          ),
+        Text('Geometry Types:', style: labelStyle),
+        const SizedBox(height: 2),
+        Text(
+          geometryTypesText,
+          style: textStyle,
+          overflow: TextOverflow.ellipsis,
+          maxLines: 2,
         ),
       ],
     );

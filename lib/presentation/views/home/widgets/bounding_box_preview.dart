@@ -40,7 +40,7 @@ class BoundingBoxPreview extends StatelessWidget {
                       ),
                       const SizedBox(width: 16),
                       Expanded(
-                        flex: 2, // Less space for coordinates
+                        flex: 1, // Less space for coordinates
                         child: _BoundingBoxCoordinates(
                           boundingBox: boundingBox,
                         ),

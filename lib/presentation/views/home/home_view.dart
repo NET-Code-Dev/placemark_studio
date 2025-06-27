@@ -30,7 +30,7 @@ class _HomeViewContent extends StatelessWidget {
       builder: (context, viewModel, child) {
         return Scaffold(
           appBar: AppBar(
-            toolbarHeight: 30.0,
+            toolbarHeight: 50.0,
             title: Row(
               children: [
                 const Text('Placemark Studio'),
@@ -51,7 +51,7 @@ class _HomeViewContent extends StatelessWidget {
                 ],
               ],
             ),
-            centerTitle: false,
+            centerTitle: true,
             actions: [
               if (viewModel.hasKmlData)
                 IconButton(
@@ -106,44 +106,31 @@ class _DataLoadedView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(4),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // First row: Left column (File Info + Export Options) and Right (Bounding Box)
           SizedBox(
-            height: 850, // Fixed height instead of IntrinsicHeight
+            height: 600,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Left column: File Info and Export Options stacked
-                Expanded(
-                  flex: 1, // 1/3 width for the left column
-                  child: Column(
-                    children: [
-                      Expanded(flex: 1, child: FileInfoPanel()),
-                      const SizedBox(
-                        height: 10,
-                      ), // Spacing between the two panels
-                      Expanded(flex: 2, child: ExportOptionsPanel()),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16), // Spacing between left and right
-                // Right side: Bounding Box Preview (full height)
                 Expanded(
                   flex: 2, // 2/3 width for bounding box
                   child: BoundingBoxPreview(),
                 ),
+                //             const SizedBox(width: 5), // Spacing between left and right
+                Expanded(flex: 1, child: FileInfoPanel()),
+                //               const SizedBox(width: 5),
+                Expanded(flex: 1, child: ExportOptionsPanel()),
               ],
             ),
           ),
-
-          //  const SizedBox(height: 5),
+          const SizedBox(height: 10),
 
           // Second row: Preview table (full width)
           const SizedBox(
-            height: 370, // Fixed height for better layout control
+            height: 270, // Fixed height for better layout control
             child: PreviewTable(),
           ),
         ],

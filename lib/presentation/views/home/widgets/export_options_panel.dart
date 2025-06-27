@@ -32,7 +32,7 @@ class ExportOptionsPanel extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(flex: 1, child: _ExportFormatSelector()),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 10),
                     Expanded(flex: 2, child: _OutputPathSelector()),
                   ],
                 ),
@@ -90,7 +90,7 @@ class _ExportFormatSelector extends StatelessWidget {
               decoration: const InputDecoration(
                 hintText: 'Select format',
                 contentPadding: EdgeInsets.symmetric(
-                  horizontal: 12,
+                  horizontal: 8,
                   vertical: 8,
                 ),
               ),
