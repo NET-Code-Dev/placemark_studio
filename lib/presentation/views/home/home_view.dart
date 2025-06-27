@@ -30,6 +30,7 @@ class _HomeViewContent extends StatelessWidget {
       builder: (context, viewModel, child) {
         return Scaffold(
           appBar: AppBar(
+            toolbarHeight: 30.0,
             title: Row(
               children: [
                 const Text('Placemark Studio'),
@@ -105,12 +106,13 @@ class _DataLoadedView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // First row: Left column (File Info + Export Options) and Right (Bounding Box)
-          IntrinsicHeight(
+          SizedBox(
+            height: 850, // Fixed height instead of IntrinsicHeight
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -119,11 +121,11 @@ class _DataLoadedView extends StatelessWidget {
                   flex: 1, // 1/3 width for the left column
                   child: Column(
                     children: [
-                      FileInfoPanel(),
+                      Expanded(flex: 1, child: FileInfoPanel()),
                       const SizedBox(
-                        height: 16,
+                        height: 10,
                       ), // Spacing between the two panels
-                      ExportOptionsPanel(),
+                      Expanded(flex: 2, child: ExportOptionsPanel()),
                     ],
                   ),
                 ),
@@ -137,11 +139,11 @@ class _DataLoadedView extends StatelessWidget {
             ),
           ),
 
-          const SizedBox(height: 16),
+          //  const SizedBox(height: 5),
 
           // Second row: Preview table (full width)
           const SizedBox(
-            height: 400, // Fixed height for better layout control
+            height: 370, // Fixed height for better layout control
             child: PreviewTable(),
           ),
         ],

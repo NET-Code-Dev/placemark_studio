@@ -1,4 +1,5 @@
 import 'package:get_it/get_it.dart';
+import 'package:placemark_studio/data/services/unified_file_parser_service.dart';
 import '../../data/services/file_picker_service.dart';
 import '../../data/services/kml_parser_service.dart';
 import '../../data/services/csv_export_service.dart';
@@ -14,6 +15,11 @@ class ServiceLocator {
     // Services
     getIt.registerLazySingleton<IFilePickerService>(() => FilePickerService());
     getIt.registerLazySingleton<IKmlParserService>(() => KmlParserService());
+    getIt.registerLazySingleton<IUnifiedFileParserService>(
+      () => UnifiedFileParserService(
+        kmlParserService: getIt<IKmlParserService>(),
+      ),
+    );
     getIt.registerLazySingleton<ICsvExportService>(() => CsvExportService());
     getIt.registerLazySingleton<IBoundingBoxService>(
       () => BoundingBoxService(),
@@ -23,7 +29,8 @@ class ServiceLocator {
     getIt.registerFactory<HomeViewModel>(
       () => HomeViewModel(
         filePickerService: getIt<IFilePickerService>(),
-        kmlParserService: getIt<IKmlParserService>(),
+        kmlParserService:
+            getIt<IUnifiedFileParserService>(), // Use unified parser
         csvExportService: getIt<ICsvExportService>(),
       ),
     );

@@ -26,11 +26,16 @@ class ExportOptionsPanel extends StatelessWidget {
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 16),
-                _ExportFormatSelector(),
-                const SizedBox(height: 16),
                 _LayerSeparationOption(),
                 const SizedBox(height: 16),
-                _OutputPathSelector(),
+                // Row for Export Format and Output Location
+                Row(
+                  children: [
+                    Expanded(flex: 1, child: _ExportFormatSelector()),
+                    const SizedBox(width: 16),
+                    Expanded(flex: 2, child: _OutputPathSelector()),
+                  ],
+                ),
                 if (viewModel.hasDuplicateHeaders) ...[
                   const SizedBox(height: 16),
                   _SimplifiedDuplicateHeadersPanel(),
@@ -83,35 +88,19 @@ class _ExportFormatSelector extends StatelessWidget {
             DropdownButtonFormField<ExportFormat>(
               value: viewModel.selectedExportFormat,
               decoration: const InputDecoration(
-                hintText: 'Select export format',
+                hintText: 'Select format',
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
               ),
               items:
                   viewModel.supportedFormats.map((format) {
                     return DropdownMenuItem(
                       value: format,
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          return Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                format.code,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Flexible(
-                                child: Text(
-                                  '- ${format.description}',
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(color: Colors.grey[600]),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          );
-                        },
+                      child: Text(
+                        format.code,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                     );
                   }).toList(),
@@ -133,75 +122,195 @@ class _LayerSeparationOption extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<HomeViewModel>(
       builder: (context, viewModel, child) {
+        final kmlData = viewModel.kmlData!;
+        final hasHierarchy = kmlData.hasHierarchy;
+        final folderCount =
+            hasHierarchy ? kmlData.totalFolderCount : kmlData.layersCount;
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Layer Output', style: Theme.of(context).textTheme.labelLarge),
+            Row(
+              children: [
+                Text(
+                  'Layer Output',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                if (hasHierarchy) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.green[100],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${kmlData.maxFolderDepth} levels deep',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.green[800],
+                        fontSize: 10,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
             const SizedBox(height: 8),
+            // Row layout for radio buttons
             Container(
               decoration: BoxDecoration(
                 border: Border.all(color: Colors.grey[300]!),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Column(
+              padding: const EdgeInsets.all(8),
+              child: Row(
                 children: [
-                  RadioListTile<bool>(
-                    title: const Text('Single file (all layers combined)'),
-                    subtitle: Text(
-                      'All data in one file',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => viewModel.setSeparateLayers(false),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color:
+                              !viewModel.separateLayers
+                                  ? Theme.of(
+                                    context,
+                                  ).colorScheme.primary.withOpacity(0.1)
+                                  : null,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          children: [
+                            Radio<bool>(
+                              value: false,
+                              groupValue: viewModel.separateLayers,
+                              onChanged: (value) {
+                                if (value != null) {
+                                  viewModel.setSeparateLayers(value);
+                                }
+                              },
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Single file',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  Text(
+                                    hasHierarchy
+                                        ? 'All folders flattened'
+                                        : 'All layers combined',
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(color: Colors.grey[600]),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                    value: false,
-                    groupValue: viewModel.separateLayers,
-                    onChanged: (value) {
-                      if (value != null) {
-                        viewModel.setSeparateLayers(value);
-                      }
-                    },
-                    dense: true,
                   ),
-                  const Divider(height: 1),
-                  RadioListTile<bool>(
-                    title: const Text('Separate files by layer'),
-                    subtitle: Text(
-                      'Each layer in its own file (organized in folder)',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => viewModel.setSeparateLayers(true),
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color:
+                              viewModel.separateLayers
+                                  ? Theme.of(
+                                    context,
+                                  ).colorScheme.primary.withOpacity(0.1)
+                                  : null,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          children: [
+                            Radio<bool>(
+                              value: true,
+                              groupValue: viewModel.separateLayers,
+                              onChanged: (value) {
+                                if (value != null) {
+                                  viewModel.setSeparateLayers(value);
+                                }
+                              },
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Separate files',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  Text(
+                                    hasHierarchy
+                                        ? 'Preserve folder structure'
+                                        : 'Each layer in own file',
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(color: Colors.grey[600]),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                    value: true,
-                    groupValue: viewModel.separateLayers,
-                    onChanged: (value) {
-                      if (value != null) {
-                        viewModel.setSeparateLayers(value);
-                      }
-                    },
-                    dense: true,
                   ),
                 ],
               ),
             ),
-            if (viewModel.separateLayers &&
-                viewModel.kmlData!.layersCount > 1) ...[
+            if (viewModel.separateLayers && folderCount > 1) ...[
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.blue[50],
-                  border: Border.all(color: Colors.blue[200]!),
+                  color: hasHierarchy ? Colors.green[50] : Colors.blue[50],
+                  border: Border.all(
+                    color:
+                        hasHierarchy ? Colors.green[200]! : Colors.blue[200]!,
+                  ),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
+                    Icon(
+                      hasHierarchy ? Icons.account_tree : Icons.info_outline,
+                      color:
+                          hasHierarchy ? Colors.green[700] : Colors.blue[700],
+                      size: 20,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Will create ${viewModel.kmlData!.layersCount} separate files in a new folder',
+                        hasHierarchy
+                            ? 'Will create ${folderCount} files maintaining the original folder structure with up to ${kmlData.maxFolderDepth} nesting levels'
+                            : 'Will create ${folderCount} separate files in a new folder',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.blue[700],
+                          color:
+                              hasHierarchy
+                                  ? Colors.green[700]
+                                  : Colors.blue[700],
                         ),
                       ),
                     ),
@@ -229,32 +338,36 @@ class _OutputPathSelector extends StatelessWidget {
               style: Theme.of(context).textTheme.labelLarge,
             ),
             const SizedBox(height: 8),
-            IntrinsicHeight(
-              child: Row(
-                mainAxisSize: MainAxisSize.max,
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      readOnly: true,
-                      decoration: InputDecoration(
-                        hintText:
-                            viewModel.hasOutputPath
-                                ? viewModel.outputPath
-                                : 'Same folder as input file',
-                        suffixIcon: const Icon(Icons.folder),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    readOnly: true,
+                    decoration: InputDecoration(
+                      hintText:
+                          viewModel.hasOutputPath
+                              ? viewModel.outputPath?.split('/').last ?? ''
+                              : 'Same folder as input file',
+                      suffixIcon: const Icon(Icons.folder),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: 80, // Fixed width for Browse button
-                    child: ElevatedButton(
-                      onPressed: viewModel.selectOutputPath,
-                      child: const Text('Browse'),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 80, // Fixed width for Browse button
+                  child: ElevatedButton(
+                    onPressed: viewModel.selectOutputPath,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
                     ),
+                    child: const Text('Browse'),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
             if (viewModel.hasOutputPath) ...[
               const SizedBox(height: 4),

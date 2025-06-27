@@ -55,9 +55,14 @@ class _FileSelectionCardState extends State<FileSelectionCard>
 
     final file = files.first;
 
-    // Validate file extension
-    if (!file.name.toLowerCase().endsWith('.kml')) {
-      _showErrorSnackBar('Invalid file type. Only KML files are supported.');
+    // Get file extension
+    final extension = file.name.split('.').last.toLowerCase();
+
+    // Validate file extension against supported types
+    if (!AppConstants.supportedFileExtensions.contains(extension)) {
+      _showErrorSnackBar(
+        'Invalid file type. Supported formats: ${AppConstants.supportedFileExtensions.join(', ').toUpperCase()}',
+      );
       return;
     }
 
@@ -180,15 +185,15 @@ class _FileSelectionCardState extends State<FileSelectionCard>
                                   const TextStyle(),
                               child: Text(
                                 _isDragOver
-                                    ? 'Drop KML File Here'
-                                    : 'Select KML File',
+                                    ? 'Drop File Here'
+                                    : 'Select KML/KMZ File',
                               ),
                             ),
                             const SizedBox(height: 12),
                             Text(
                               _isDragOver
-                                  ? 'Release to upload your KML file'
-                                  : 'Choose a KML file to convert and analyze.\nSupported formats: .kml',
+                                  ? 'Release to upload your file'
+                                  : 'Choose a KML or KMZ file to convert and analyze.\nSupported formats: ${AppConstants.supportedFileExtensions.join(', ').toUpperCase()}',
                               style: Theme.of(
                                 context,
                               ).textTheme.bodyLarge?.copyWith(
@@ -262,7 +267,7 @@ class _FileSelectionCardState extends State<FileSelectionCard>
                                   Text(
                                     _isDragOver
                                         ? 'Drop your file now!'
-                                        : 'Or drag and drop a KML file here',
+                                        : 'Or drag and drop a KML/KMZ file here',
                                   ),
                                 ],
                               ),
@@ -286,7 +291,7 @@ class _FileSelectionCardState extends State<FileSelectionCard>
                                   ),
                                 ),
                                 child: Text(
-                                  'Max file size: ${AppConstants.maxFileSizeBytes ~/ (1024 * 1024)}MB',
+                                  'Max file size: ${AppConstants.maxFileSizeBytes ~/ (1024 * 1024)}MB | Formats: ${AppConstants.supportedFileExtensions.join(', ').toUpperCase()}',
                                   style: Theme.of(
                                     context,
                                   ).textTheme.bodySmall?.copyWith(

@@ -5,6 +5,7 @@ import '../../core/enums/coordinate_units.dart';
 import 'coordinate.dart';
 import 'placemark.dart';
 import 'bounding_box.dart';
+import 'kml_folder.dart'; // Add this import
 
 class KmlData extends Equatable {
   final String fileName;
@@ -17,6 +18,7 @@ class KmlData extends Equatable {
   final int layersCount;
   final Map<String, int> geometryTypeCounts;
   final Set<String> availableFields;
+  final KmlFolder? folderStructure; // Add optional folder structure
 
   const KmlData({
     required this.fileName,
@@ -29,6 +31,7 @@ class KmlData extends Equatable {
     this.layersCount = 1,
     this.geometryTypeCounts = const {},
     this.availableFields = const {},
+    this.folderStructure, // Add this parameter
   });
 
   factory KmlData.empty() {
@@ -46,9 +49,52 @@ class KmlData extends Equatable {
     );
   }
 
-  int get featuresCount => placemarks.length;
+  // Enhanced getters that consider folder structure
+  int get featuresCount =>
+      hasHierarchy
+          ? folderStructure!.getTotalPlacemarkCount()
+          : placemarks.length;
 
-  bool get hasData => placemarks.isNotEmpty;
+  bool get hasData =>
+      hasHierarchy ? folderStructure!.hasPlacemarks : placemarks.isNotEmpty;
+
+  // New hierarchy-related getters
+  bool get hasHierarchy => folderStructure != null;
+
+  List<Placemark> get allPlacemarks =>
+      hasHierarchy ? folderStructure!.getAllPlacemarks() : placemarks;
+
+  int get maxFolderDepth => hasHierarchy ? folderStructure!.getMaxDepth() : 0;
+
+  int get totalFolderCount =>
+      hasHierarchy ? folderStructure!.getTotalFolderCount() : layersCount;
+
+  /// Get a summary of the folder structure
+  Map<String, dynamic> get folderSummary =>
+      hasHierarchy
+          ? {
+            'hasHierarchy': true,
+            'maxDepth': maxFolderDepth,
+            'totalFolders': totalFolderCount,
+            'folderPaths': folderStructure!.getAllFolderPaths(),
+            'rootFolder': folderStructure!.getSummary(),
+          }
+          : {
+            'hasHierarchy': false,
+            'maxDepth': 0,
+            'totalFolders': layersCount,
+            'folderPaths': <String>[],
+          };
+
+  /// Get folders at a specific depth level
+  List<KmlFolder> getFoldersAtDepth(int depth) {
+    return hasHierarchy ? folderStructure!.getFoldersAtDepth(depth) : [];
+  }
+
+  /// Find a folder by its path
+  KmlFolder? findFolderByPath(String path) {
+    return hasHierarchy ? folderStructure!.findFolderByPath(path) : null;
+  }
 
   KmlData copyWith({
     String? fileName,
@@ -61,6 +107,7 @@ class KmlData extends Equatable {
     int? layersCount,
     Map<String, int>? geometryTypeCounts,
     Set<String>? availableFields,
+    KmlFolder? folderStructure, // Add this parameter
   }) {
     return KmlData(
       fileName: fileName ?? this.fileName,
@@ -74,6 +121,7 @@ class KmlData extends Equatable {
       layersCount: layersCount ?? this.layersCount,
       geometryTypeCounts: geometryTypeCounts ?? this.geometryTypeCounts,
       availableFields: availableFields ?? this.availableFields,
+      folderStructure: folderStructure ?? this.folderStructure, // Add this
     );
   }
 
@@ -89,5 +137,6 @@ class KmlData extends Equatable {
     layersCount,
     geometryTypeCounts,
     availableFields,
+    folderStructure, // Add this to props
   ];
 }

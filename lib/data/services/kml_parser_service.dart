@@ -2,40 +2,39 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:xml/xml.dart';
 import '../../core/errors/app_exception.dart';
-//import '../../core/enums/geometry_type.dart';
 import '../models/kml_data.dart';
 import '../models/placemark.dart';
 import '../models/geometry.dart';
 import '../models/coordinate.dart';
 import '../models/bounding_box.dart';
+import '../models/kml_folder.dart';
 
 abstract class IKmlParserService {
-  Future<KmlData> parseKmlFile(File file);
+  Future<KmlData> parseKmlFile(File file, {bool preserveHierarchy = true});
+  Future<KmlData> parseKmlContent(
+    String content,
+    String fileName, {
+    bool preserveHierarchy = true,
+  });
 }
 
 class KmlParserService implements IKmlParserService {
   @override
-  Future<KmlData> parseKmlFile(File file) async {
+  Future<KmlData> parseKmlFile(
+    File file, {
+    bool preserveHierarchy = true,
+  }) async {
     try {
       final content = await file.readAsString();
-      final document = XmlDocument.parse(content);
       final stat = await file.stat();
-
-      final placemarks = await _parsePlacemarks(document);
-      final allCoordinates = _extractAllCoordinates(placemarks);
-      final boundingBox = BoundingBox.fromCoordinates(allCoordinates);
-      final availableFields = _extractAvailableFields(placemarks);
-      final geometryTypeCounts = _countGeometryTypes(placemarks);
-
-      return KmlData(
-        fileName: file.path.split('/').last,
-        fileSize: stat.size,
-        placemarks: placemarks,
-        boundingBox: boundingBox,
-        availableFields: availableFields,
-        geometryTypeCounts: geometryTypeCounts,
-        layersCount: _countLayers(document),
+      final result = await parseKmlContent(
+        content,
+        file.path.split('/').last,
+        preserveHierarchy: preserveHierarchy,
       );
+
+      // Update with actual file size
+      return result.copyWith(fileSize: stat.size);
     } catch (e) {
       if (e is AppException) rethrow;
 
@@ -47,6 +46,116 @@ class KmlParserService implements IKmlParserService {
     }
   }
 
+  @override
+  Future<KmlData> parseKmlContent(
+    String content,
+    String fileName, {
+    bool preserveHierarchy = true,
+  }) async {
+    try {
+      final document = XmlDocument.parse(content);
+
+      KmlFolder? folderStructure;
+      List<Placemark> flatPlacemarks;
+      int layersCount;
+
+      if (preserveHierarchy) {
+        // Find the correct starting element for folder parsing
+        XmlElement documentElement;
+
+        // First try to find Document element, fall back to kml element
+        final documentElements = document.findAllElements('Document').toList();
+        if (documentElements.isNotEmpty) {
+          documentElement = documentElements.first;
+        } else {
+          documentElement = document.findElements('kml').first;
+        }
+
+        folderStructure = await _parseFolder(documentElement, depth: 0);
+        flatPlacemarks = folderStructure.getAllPlacemarks();
+        layersCount = folderStructure.getTotalFolderCount();
+      } else {
+        // Parse flat (existing behavior)
+        flatPlacemarks = await _parsePlacemarks(document);
+        layersCount = _countLayers(document);
+      }
+
+      final allCoordinates = _extractAllCoordinates(flatPlacemarks);
+      final boundingBox = BoundingBox.fromCoordinates(allCoordinates);
+      final availableFields = _extractAvailableFields(flatPlacemarks);
+      final geometryTypeCounts = _countGeometryTypes(flatPlacemarks);
+
+      return KmlData(
+        fileName: fileName,
+        fileSize: content.length, // Approximate size for content
+        placemarks: flatPlacemarks,
+        boundingBox: boundingBox,
+        availableFields: availableFields,
+        geometryTypeCounts: geometryTypeCounts,
+        layersCount: layersCount,
+        folderStructure: folderStructure,
+      );
+    } catch (e) {
+      if (e is AppException) rethrow;
+
+      throw FileProcessingException(
+        'Failed to parse KML content: ${e.toString()}',
+        code: 'KML_PARSE_ERROR',
+        details: e,
+      );
+    }
+  }
+
+  /// Parse a folder and its contents recursively
+  Future<KmlFolder> _parseFolder(XmlElement element, {int depth = 0}) async {
+    final name = _getElementText(element, 'name');
+    final description = _getElementText(element, 'description');
+    final extendedData = _parseExtendedData(element);
+    final styleUrl = _getElementText(element, 'styleUrl');
+
+    // Parse direct placemarks in this folder
+    final placemarks = <Placemark>[];
+    final placemarkElements = element.findElements('Placemark').toList();
+
+    for (final placemarkElement in placemarkElements) {
+      try {
+        final placemark = await _parsePlacemark(placemarkElement);
+        placemarks.add(placemark);
+      } catch (e) {
+        if (kDebugMode) {
+          print('Warning: Failed to parse placemark: $e');
+        }
+      }
+    }
+
+    // Parse sub-folders recursively
+    final subFolders = <KmlFolder>[];
+    final folderElements = element.findElements('Folder').toList();
+
+    for (final folderElement in folderElements) {
+      try {
+        final subFolder = await _parseFolder(folderElement, depth: depth + 1);
+        subFolders.add(subFolder);
+      } catch (e) {
+        if (kDebugMode) {
+          print('Warning: Failed to parse folder: $e');
+        }
+      }
+    }
+
+    return KmlFolder(
+      name:
+          name.isNotEmpty ? name : (depth == 0 ? 'Document' : 'Unnamed Folder'),
+      description: description,
+      placemarks: placemarks,
+      subFolders: subFolders,
+      extendedData: extendedData,
+      styleUrl: styleUrl.isNotEmpty ? styleUrl : null,
+      depth: depth,
+    );
+  }
+
+  // Existing methods (keeping backward compatibility)
   Future<List<Placemark>> _parsePlacemarks(XmlDocument document) async {
     final placemarkElements = document.findAllElements('Placemark');
 
@@ -235,20 +344,20 @@ class KmlParserService implements IKmlParserService {
     }
 
     try {
-      // Simple HTML table parsing - look for table row patterns
-      final rows = description.split('<tr');
+      // Parse the HTML content to find tables
+      final tables = _extractTablesFromHtml(description);
 
-      for (final row in rows) {
-        if (!row.contains('<td') && !row.contains('<th')) continue;
-
-        final cells = _extractTableCellsFromRow(row);
-        if (cells.length >= 2) {
-          // Assume first cell is header/key
-          final key = cells[0].trim();
-          if (key.isNotEmpty &&
-              !key.toLowerCase().contains('field') &&
-              !key.toLowerCase().contains('value')) {
-            headers.add(key);
+      for (final tableRows in tables) {
+        for (final row in tableRows) {
+          if (row.length >= 2) {
+            // First cell is the header/key
+            final key = row[0].trim();
+            if (key.isNotEmpty &&
+                !key.toLowerCase().contains('field') &&
+                !key.toLowerCase().contains('value') &&
+                key.isNotEmpty) {
+              headers.add(key);
+            }
           }
         }
       }
@@ -261,21 +370,92 @@ class KmlParserService implements IKmlParserService {
     return headers;
   }
 
-  List<String> _extractTableCellsFromRow(String row) {
+  /// Extract all tables from HTML content, handling nested tables
+  List<List<List<String>>> _extractTablesFromHtml(String html) {
+    final tables = <List<List<String>>>[];
+
+    try {
+      // Find all table elements
+      final tableRegex = RegExp(
+        r'<table[^>]*>(.*?)</table>',
+        caseSensitive: false,
+        dotAll: true,
+      );
+
+      final tableMatches = tableRegex.allMatches(html);
+
+      for (final tableMatch in tableMatches) {
+        final tableContent = tableMatch.group(1) ?? '';
+        final rows = _extractRowsFromTable(tableContent);
+
+        if (rows.isNotEmpty) {
+          tables.add(rows);
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Warning: Failed to extract tables from HTML: $e');
+      }
+    }
+
+    return tables;
+  }
+
+  /// Extract rows from a table, handling bgcolor and other attributes
+  List<List<String>> _extractRowsFromTable(String tableContent) {
+    final rows = <List<String>>[];
+
+    try {
+      // Find all tr elements, including those with attributes like bgcolor
+      final rowRegex = RegExp(
+        r'<tr[^>]*>(.*?)</tr>',
+        caseSensitive: false,
+        dotAll: true,
+      );
+
+      final rowMatches = rowRegex.allMatches(tableContent);
+
+      for (final rowMatch in rowMatches) {
+        final rowContent = rowMatch.group(1) ?? '';
+        final cells = _extractCellsFromRow(rowContent);
+
+        // Only add rows that have exactly 2 cells (key-value pairs)
+        if (cells.length == 2 && cells[0].trim().isNotEmpty) {
+          rows.add(cells);
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Warning: Failed to extract rows from table: $e');
+      }
+    }
+
+    return rows;
+  }
+
+  /// Extract cells from a table row
+  List<String> _extractCellsFromRow(String rowContent) {
     final cells = <String>[];
 
-    // Extract content between <td> or <th> tags
-    final cellRegex = RegExp(
-      r'<t[dh][^>]*>(.*?)</t[dh]>',
-      caseSensitive: false,
-      dotAll: true,
-    );
-    final matches = cellRegex.allMatches(row);
+    try {
+      // Find all td elements, handling nested content
+      final cellRegex = RegExp(
+        r'<td[^>]*>(.*?)</td>',
+        caseSensitive: false,
+        dotAll: true,
+      );
 
-    for (final match in matches) {
-      final cellContent = match.group(1) ?? '';
-      final cleanContent = _stripHtmlTags(cellContent).trim();
-      cells.add(cleanContent);
+      final cellMatches = cellRegex.allMatches(rowContent);
+
+      for (final cellMatch in cellMatches) {
+        final cellContent = cellMatch.group(1) ?? '';
+        final cleanContent = _stripHtmlTags(cellContent).trim();
+        cells.add(cleanContent);
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Warning: Failed to extract cells from row: $e');
+      }
     }
 
     return cells;

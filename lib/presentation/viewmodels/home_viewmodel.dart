@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 import 'package:file_picker/file_picker.dart';
 import '../../data/services/file_picker_service.dart';
-import '../../data/services/kml_parser_service.dart';
+import '../../data/services/unified_file_parser_service.dart'; // Changed import
 import '../../data/services/csv_export_service.dart';
 import '../../data/models/kml_data.dart';
 import '../../data/models/export_options.dart';
@@ -16,15 +16,16 @@ import 'base_viewmodel.dart';
 
 class HomeViewModel extends BaseViewModel {
   final IFilePickerService _filePickerService;
-  final IKmlParserService _kmlParserService;
+  final IUnifiedFileParserService _fileParserService; // Changed type
   final ICsvExportService _csvExportService;
 
   HomeViewModel({
     required IFilePickerService filePickerService,
-    required IKmlParserService kmlParserService,
+    required IUnifiedFileParserService
+    kmlParserService, // Keep parameter name for compatibility
     required ICsvExportService csvExportService,
   }) : _filePickerService = filePickerService,
-       _kmlParserService = kmlParserService,
+       _fileParserService = kmlParserService, // Assign to new field
        _csvExportService = csvExportService;
 
   File? _selectedFile;
@@ -134,7 +135,7 @@ class HomeViewModel extends BaseViewModel {
         await _updateWindowTitle(fileName);
         await _enterFullscreenMode();
 
-        // Automatically parse the KML file and generate preview
+        // Automatically parse the file and generate preview
         await _parseAndPreview();
 
         setSuccess();
@@ -164,7 +165,7 @@ class HomeViewModel extends BaseViewModel {
       await _updateWindowTitle(fileName);
       await _enterFullscreenMode();
 
-      // Automatically parse the KML file and generate preview
+      // Automatically parse the file and generate preview
       await _parseAndPreview();
 
       setSuccess();
@@ -188,7 +189,7 @@ class HomeViewModel extends BaseViewModel {
     final extension = file.path.split('.').last.toLowerCase();
     if (!AppConstants.supportedFileExtensions.contains(extension)) {
       throw FileProcessingException(
-        'Unsupported file format. Only KML files are supported.',
+        'Unsupported file format. Supported formats: ${AppConstants.supportedFileExtensions.join(', ').toUpperCase()}',
         code: 'UNSUPPORTED_FORMAT',
       );
     }
@@ -202,14 +203,26 @@ class HomeViewModel extends BaseViewModel {
       );
     }
 
-    // Basic KML content validation
+    // Enhanced file content validation for both KML and KMZ
     try {
-      final content = await file.readAsString();
-      if (!content.trim().startsWith('<?xml') || !content.contains('<kml')) {
-        throw FileProcessingException(
-          'Invalid KML file format',
-          code: 'INVALID_KML_FORMAT',
-        );
+      if (extension == 'kml') {
+        final content = await file.readAsString();
+        if (!content.trim().startsWith('<?xml') || !content.contains('<kml')) {
+          throw FileProcessingException(
+            'Invalid KML file format',
+            code: 'INVALID_KML_FORMAT',
+          );
+        }
+      } else if (extension == 'kmz') {
+        final bytes = await file.readAsBytes();
+
+        // Check for ZIP file signature (PK)
+        if (bytes.length < 4 || bytes[0] != 0x50 || bytes[1] != 0x4B) {
+          throw FileProcessingException(
+            'Invalid KMZ file format - not a valid ZIP archive',
+            code: 'INVALID_KMZ_FORMAT',
+          );
+        }
       }
     } catch (e) {
       if (e is FileProcessingException) rethrow;
@@ -224,8 +237,8 @@ class HomeViewModel extends BaseViewModel {
     if (_selectedFile == null) return;
 
     try {
-      // Parse KML file
-      _kmlData = await _kmlParserService.parseKmlFile(_selectedFile!);
+      // Use the unified parser that handles both KML and KMZ
+      _kmlData = await _fileParserService.parseFile(_selectedFile!);
 
       // Detect duplicate headers
       _duplicateHeaders = _csvExportService.detectDuplicateHeaders(_kmlData!);

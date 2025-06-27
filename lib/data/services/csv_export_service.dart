@@ -119,20 +119,19 @@ class CsvExportService implements ICsvExportService {
     }
 
     try {
-      // Split by table rows
-      final rows = description.split('<tr');
+      // Parse the HTML content to find tables
+      final tables = _extractTablesFromHtml(description);
 
-      for (final row in rows) {
-        if (!row.contains('<td') && !row.contains('<th')) continue;
-
-        final cells = _extractTableCells(row);
-        if (cells.length >= 2) {
-          // First cell is the header/key
-          final key = cells[0].trim();
-          if (key.isNotEmpty &&
-              !key.toLowerCase().contains('field') &&
-              !key.toLowerCase().contains('value')) {
-            headers.add(key);
+      for (final tableRows in tables) {
+        for (final row in tableRows) {
+          if (row.length >= 2) {
+            // First cell is the header/key
+            final key = row[0].trim();
+            if (key.isNotEmpty &&
+                !key.toLowerCase().contains('field') &&
+                !key.toLowerCase().contains('value')) {
+              headers.add(key);
+            }
           }
         }
       }
@@ -143,6 +142,97 @@ class CsvExportService implements ICsvExportService {
     }
 
     return headers;
+  }
+
+  /// Extract all tables from HTML content, handling nested tables
+  List<List<List<String>>> _extractTablesFromHtml(String html) {
+    final tables = <List<List<String>>>[];
+
+    try {
+      // Find all table elements
+      final tableRegex = RegExp(
+        r'<table[^>]*>(.*?)</table>',
+        caseSensitive: false,
+        dotAll: true,
+      );
+
+      final tableMatches = tableRegex.allMatches(html);
+
+      for (final tableMatch in tableMatches) {
+        final tableContent = tableMatch.group(1) ?? '';
+        final rows = _extractRowsFromTable(tableContent);
+
+        if (rows.isNotEmpty) {
+          tables.add(rows);
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Warning: Failed to extract tables from HTML: $e');
+      }
+    }
+
+    return tables;
+  }
+
+  /// Extract rows from a table, handling bgcolor and other attributes
+  List<List<String>> _extractRowsFromTable(String tableContent) {
+    final rows = <List<String>>[];
+
+    try {
+      // Find all tr elements, including those with attributes like bgcolor
+      final rowRegex = RegExp(
+        r'<tr[^>]*>(.*?)</tr>',
+        caseSensitive: false,
+        dotAll: true,
+      );
+
+      final rowMatches = rowRegex.allMatches(tableContent);
+
+      for (final rowMatch in rowMatches) {
+        final rowContent = rowMatch.group(1) ?? '';
+        final cells = _extractCellsFromRow(rowContent);
+
+        // Only add rows that have exactly 2 cells (key-value pairs)
+        if (cells.length == 2 && cells[0].trim().isNotEmpty) {
+          rows.add(cells);
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Warning: Failed to extract rows from table: $e');
+      }
+    }
+
+    return rows;
+  }
+
+  /// Extract cells from a table row
+  List<String> _extractCellsFromRow(String rowContent) {
+    final cells = <String>[];
+
+    try {
+      // Find all td elements, handling nested content
+      final cellRegex = RegExp(
+        r'<td[^>]*>(.*?)</td>',
+        caseSensitive: false,
+        dotAll: true,
+      );
+
+      final cellMatches = cellRegex.allMatches(rowContent);
+
+      for (final cellMatch in cellMatches) {
+        final cellContent = cellMatch.group(1) ?? '';
+        final cleanContent = _stripHtmlTags(cellContent).trim();
+        cells.add(cleanContent);
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Warning: Failed to extract cells from row: $e');
+      }
+    }
+
+    return cells;
   }
 
   /// Process duplicate headers within a single table
@@ -270,30 +360,30 @@ class CsvExportService implements ICsvExportService {
     }
 
     try {
-      final rows = description.split('<tr');
+      // Use the improved table parsing logic
+      final tables = _extractTablesFromHtml(description);
       final headerCounts = <String, int>{};
 
-      for (final row in rows) {
-        if (!row.contains('<td') && !row.contains('<th')) continue;
+      for (final tableRows in tables) {
+        for (final row in tableRows) {
+          if (row.length >= 2) {
+            final originalKey = row[0].trim();
+            final value = row[1].trim();
 
-        final cells = _extractTableCells(row);
-        if (cells.length >= 2) {
-          final originalKey = cells[0].trim();
-          final value = cells[1].trim();
+            if (originalKey.isNotEmpty) {
+              String key;
+              if (headerCounts.containsKey(originalKey)) {
+                // This is a duplicate - add with suffix
+                headerCounts[originalKey] = headerCounts[originalKey]! + 1;
+                key = '${originalKey}_${headerCounts[originalKey]}';
+              } else {
+                // First occurrence
+                headerCounts[originalKey] = 1;
+                key = originalKey;
+              }
 
-          if (originalKey.isNotEmpty) {
-            String key;
-            if (headerCounts.containsKey(originalKey)) {
-              // This is a duplicate - add with suffix
-              headerCounts[originalKey] = headerCounts[originalKey]! + 1;
-              key = '${originalKey}_${headerCounts[originalKey]}';
-            } else {
-              // First occurrence
-              headerCounts[originalKey] = 1;
-              key = originalKey;
+              tableData[key] = value;
             }
-
-            tableData[key] = value;
           }
         }
       }
