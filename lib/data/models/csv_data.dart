@@ -27,10 +27,10 @@ class CsvData extends Equatable {
 
   /// Validate coordinates based on column mapping
   CsvData validateCoordinates(ColumnMapping mapping) {
-    if (!mapping.isValid) {
+    if (!mapping.hasCoordinates) {
       return copyWith(
         validationErrors: [
-          'Invalid column mapping: missing required latitude/longitude columns',
+          'Cannot validate coordinates: latitude and longitude columns must be mapped',
         ],
         validRowCount: 0,
       );
@@ -42,47 +42,71 @@ class CsvData extends Equatable {
     for (int i = 0; i < rows.length; i++) {
       final row = rows[i];
       final rowNumber = i + 1;
+      bool rowIsValid = true;
 
       try {
         // Validate latitude
         final latValue = row[mapping.latitudeColumn];
-        if (latValue == null) {
+        if (latValue == null || latValue.toString().trim().isEmpty) {
           errors.add('Row $rowNumber: Missing latitude value');
-          continue;
-        }
-
-        final latitude = _parseCoordinate(latValue);
-        if (latitude == null || latitude < -90 || latitude > 90) {
-          errors.add('Row $rowNumber: Invalid latitude value: $latValue');
-          continue;
+          rowIsValid = false;
+        } else {
+          final latitude = _parseCoordinate(latValue);
+          if (latitude == null) {
+            errors.add('Row $rowNumber: Invalid latitude format: "$latValue"');
+            rowIsValid = false;
+          } else if (latitude < -90 || latitude > 90) {
+            errors.add(
+              'Row $rowNumber: Latitude out of range (-90 to 90): $latitude',
+            );
+            rowIsValid = false;
+          }
         }
 
         // Validate longitude
         final lonValue = row[mapping.longitudeColumn];
-        if (lonValue == null) {
+        if (lonValue == null || lonValue.toString().trim().isEmpty) {
           errors.add('Row $rowNumber: Missing longitude value');
-          continue;
+          rowIsValid = false;
+        } else {
+          final longitude = _parseCoordinate(lonValue);
+          if (longitude == null) {
+            errors.add('Row $rowNumber: Invalid longitude format: "$lonValue"');
+            rowIsValid = false;
+          } else if (longitude < -180 || longitude > 180) {
+            errors.add(
+              'Row $rowNumber: Longitude out of range (-180 to 180): $longitude',
+            );
+            rowIsValid = false;
+          }
         }
 
-        final longitude = _parseCoordinate(lonValue);
-        if (longitude == null || longitude < -180 || longitude > 180) {
-          errors.add('Row $rowNumber: Invalid longitude value: $lonValue');
-          continue;
+        // Validate name if required
+        if (mapping.nameColumn != null) {
+          final nameValue = row[mapping.nameColumn];
+          if (nameValue == null || nameValue.toString().trim().isEmpty) {
+            errors.add('Row $rowNumber: Missing name/title value');
+            rowIsValid = false;
+          }
         }
 
         // Validate elevation if provided
         if (mapping.elevationColumn != null) {
           final elevValue = row[mapping.elevationColumn];
-          if (elevValue != null && elevValue.toString().isNotEmpty) {
+          if (elevValue != null && elevValue.toString().trim().isNotEmpty) {
             final elevation = _parseCoordinate(elevValue);
             if (elevation == null) {
-              errors.add('Row $rowNumber: Invalid elevation value: $elevValue');
-              continue;
+              errors.add(
+                'Row $rowNumber: Invalid elevation format: "$elevValue"',
+              );
+              // Don't mark row as invalid for elevation issues
             }
           }
         }
 
-        validCount++;
+        if (rowIsValid) {
+          validCount++;
+        }
       } catch (e) {
         errors.add('Row $rowNumber: Validation error: ${e.toString()}');
       }
@@ -104,7 +128,14 @@ class CsvData extends Equatable {
 
       // Handle common coordinate formats
       // Remove any non-numeric characters except decimal point and minus sign
-      final cleanValue = stringValue.replaceAll(RegExp(r'[^\d.-]'), '');
+      final cleanValue = stringValue
+          .replaceAll(
+            RegExp(r'[^\d.\-+]'),
+            '',
+          ) // Keep digits, decimal, minus, plus
+          .replaceAll(RegExp(r'^\+'), ''); // Remove leading plus sign
+
+      if (cleanValue.isEmpty) return null;
 
       return double.tryParse(cleanValue);
     } catch (e) {

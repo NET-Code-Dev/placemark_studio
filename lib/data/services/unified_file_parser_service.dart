@@ -4,8 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:archive/archive.dart';
 import '../../core/errors/app_exception.dart';
 import '../models/kml_data.dart';
-import '../models/bounding_box.dart';
-import '../models/coordinate.dart';
 import 'kml_parser_service.dart';
 
 abstract class IUnifiedFileParserService {

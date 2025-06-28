@@ -4,7 +4,6 @@ import 'package:path/path.dart' as path;
 import 'package:archive/archive.dart';
 import '../../core/errors/app_exception.dart';
 import '../../core/enums/geometry_type.dart';
-import '../../core/enums/export_format.dart';
 import '../models/csv_data.dart';
 import '../models/column_mapping.dart';
 import '../models/kml_generation_options.dart';
@@ -232,7 +231,7 @@ class KmlGenerationService implements IKmlGenerationService {
       final description =
           row[columnMapping.descriptionColumn]?.toString() ?? '';
       if (description.isNotEmpty) {
-        buffer.writeln('<description><![CDATA[${description}]]></description>');
+        buffer.writeln('<description><![CDATA[$description]]></description>');
       }
     }
 

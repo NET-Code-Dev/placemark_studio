@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
 import 'package:flutter/foundation.dart';
@@ -217,18 +218,26 @@ class CsvParserService implements ICsvParserService {
     final delimiters = [',', ';', '\t', '|'];
     final scores = <String, int>{};
 
+    if (kDebugMode) {
+      print('=== CSV DELIMITER DETECTION ===');
+      print(
+        'Sample content (first 200 chars): ${sampleContent.substring(0, math.min(200, sampleContent.length))}',
+      );
+    }
+
     for (final delimiter in delimiters) {
       try {
         final converter = CsvToListConverter(
           fieldDelimiter: delimiter,
           textDelimiter: '"',
           shouldParseNumbers: false,
+          allowInvalid: true, // Allow invalid CSV to continue parsing
         );
 
         final parsed = converter.convert(sampleContent);
 
         if (parsed.isNotEmpty) {
-          // Score based on consistency of column counts
+          // Score based on consistency of column counts and reasonable column numbers
           final columnCounts = parsed.map((row) => row.length).toList();
           final firstRowCount = columnCounts.first;
 
@@ -238,22 +247,47 @@ class CsvParserService implements ICsvParserService {
           final consistencyScore =
               (consistentRows * 100) ~/ columnCounts.length;
 
-          // Prefer delimiters that result in more columns (within reason)
-          final columnScore =
-              firstRowCount > 1 && firstRowCount < 50 ? firstRowCount : 0;
+          // Prefer delimiters that result in reasonable number of columns (2-200)
+          int columnScore = 0;
+          if (firstRowCount >= 2 && firstRowCount <= 200) {
+            columnScore = math.min(firstRowCount, 50); // Cap bonus at 50
+          }
 
-          scores[delimiter] = consistencyScore + columnScore;
+          final totalScore = consistencyScore + columnScore;
+          scores[delimiter] = totalScore;
+
+          if (kDebugMode) {
+            print(
+              'Delimiter "$delimiter": ${firstRowCount} columns, consistency: $consistencyScore%, score: $totalScore',
+            );
+          }
         }
       } catch (e) {
         scores[delimiter] = 0;
+        if (kDebugMode) {
+          print('Delimiter "$delimiter" failed: $e');
+        }
       }
     }
 
     // Return delimiter with highest score, defaulting to comma
-    if (scores.isEmpty) return ',';
+    if (scores.isEmpty || scores.values.every((score) => score == 0)) {
+      if (kDebugMode) {
+        print('No valid delimiter found, defaulting to comma');
+      }
+      return ',';
+    }
 
-    final bestDelimiter =
-        scores.entries.reduce((a, b) => a.value > b.value ? a : b).key;
+    final bestEntry = scores.entries.reduce(
+      (a, b) => a.value > b.value ? a : b,
+    );
+    final bestDelimiter = bestEntry.key;
+
+    if (kDebugMode) {
+      print(
+        'Selected delimiter: "$bestDelimiter" with score: ${bestEntry.value}',
+      );
+    }
 
     return bestDelimiter;
   }

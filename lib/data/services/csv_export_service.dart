@@ -397,6 +397,7 @@ class CsvExportService implements ICsvExportService {
     return tableData;
   }
 
+  /*
   Map<String, String> _extractTableData(String description) {
     // Use the new method that handles duplicates
     return _extractTableDataWithDuplicates(description);
@@ -425,7 +426,7 @@ class CsvExportService implements ICsvExportService {
 
     return cells;
   }
-
+*/
   String _stripHtmlTags(String html) {
     return html
         .replaceAll(RegExp(r'<[^>]*>'), '') // Remove HTML tags

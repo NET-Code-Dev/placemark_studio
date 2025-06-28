@@ -1,4 +1,3 @@
-import '../constants/app_constants.dart';
 import '../../data/models/kml_folder.dart';
 
 class FolderFileNamingHelper {
@@ -135,12 +134,12 @@ class FolderFileNamingHelper {
 
     String abbreviated;
     if (middleCount == 1) {
-      abbreviated = '${first}_${_sanitizeFolderName(pathParts[1])}_${last}';
+      abbreviated = '${first}_${_sanitizeFolderName(pathParts[1])}_$last';
     } else {
-      abbreviated = '${first}_${middleCount}lvl_${last}';
+      abbreviated = '${first}_${middleCount}lvl_$last';
     }
 
-    return '${abbreviated}_${sanitizedFolderName}';
+    return '${abbreviated}_$sanitizedFolderName';
   }
 
   /// Indexed strategy: depth-based indexing for very deep structures

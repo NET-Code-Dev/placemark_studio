@@ -45,9 +45,19 @@ class _CsvConverterContent extends StatelessWidget {
           body: Column(
             children: [
               // Status messages
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: StatusMessageCard(),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Consumer<CsvConverterViewModel>(
+                  builder: (context, viewModel, child) {
+                    return StatusMessageCard(
+                      hasError: viewModel.hasError,
+                      errorMessage: viewModel.errorMessage,
+                      successMessage: viewModel.successMessage,
+                      onDismissError: viewModel.clearError,
+                      onDismissSuccess: viewModel.clearMessages,
+                    );
+                  },
+                ),
               ),
 
               // Main content
@@ -117,10 +127,10 @@ class _ConversionWorkflowView extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              // Step 2: Preview Data
+              // Step 2: Preview Data - REPLACE existing step
               _WorkflowStep(
                 stepNumber: 2,
-                title: 'Preview Data',
+                title: 'Preview & Validate Data',
                 subtitle: 'Review your data and validate coordinates',
                 isActive: viewModel.currentStep >= ConversionStep.dataPreview,
                 isCompleted: viewModel.currentStep > ConversionStep.dataPreview,
@@ -128,11 +138,16 @@ class _ConversionWorkflowView extends StatelessWidget {
                     viewModel.currentStep >= ConversionStep.dataPreview
                         ? const CsvPreviewTable()
                         : null,
+                canActivate: viewModel.columnMapping?.hasCoordinates ?? false,
+                inactiveReason:
+                    viewModel.columnMapping?.hasCoordinates == false
+                        ? 'Complete column mapping first'
+                        : null,
               ),
 
               const SizedBox(height: 16),
 
-              // Step 3: Geometry & Styling
+              // Step 3: Geometry & Styling - REPLACE existing step
               _WorkflowStep(
                 stepNumber: 3,
                 title: 'Geometry & Styling',
@@ -151,11 +166,16 @@ class _ConversionWorkflowView extends StatelessWidget {
                           ],
                         )
                         : null,
+                canActivate: viewModel.canProceedToStyling,
+                inactiveReason:
+                    !viewModel.canProceedToStyling
+                        ? 'Validate coordinate data first'
+                        : null,
               ),
 
               const SizedBox(height: 16),
 
-              // Step 4: Export Options
+              // Step 4: Export Options - REPLACE existing step
               _WorkflowStep(
                 stepNumber: 4,
                 title: 'Export Options',
@@ -165,6 +185,11 @@ class _ConversionWorkflowView extends StatelessWidget {
                 child:
                     viewModel.currentStep >= ConversionStep.exportOptions
                         ? const KmlExportPanel()
+                        : null,
+                canActivate: viewModel.canExport,
+                inactiveReason:
+                    !viewModel.canExport
+                        ? 'Complete previous steps first'
                         : null,
               ),
             ],
@@ -182,6 +207,8 @@ class _WorkflowStep extends StatelessWidget {
   final bool isActive;
   final bool isCompleted;
   final Widget? child;
+  final bool canActivate;
+  final String? inactiveReason;
 
   const _WorkflowStep({
     required this.stepNumber,
@@ -190,16 +217,20 @@ class _WorkflowStep extends StatelessWidget {
     required this.isActive,
     required this.isCompleted,
     this.child,
+    this.canActivate = true,
+    this.inactiveReason,
   });
 
   @override
   Widget build(BuildContext context) {
+    final effectivelyActive = isActive && canActivate;
+
     return Card(
-      elevation: isActive ? 4 : 2,
+      elevation: effectivelyActive ? 4 : 2,
       color:
           isCompleted
               ? Colors.green[50]
-              : isActive
+              : effectivelyActive
               ? null
               : Colors.grey[100],
       child: Padding(
@@ -218,15 +249,19 @@ class _WorkflowStep extends StatelessWidget {
                     color:
                         isCompleted
                             ? Colors.green
-                            : isActive
+                            : effectivelyActive
                             ? Theme.of(context).colorScheme.primary
                             : Colors.grey[400],
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    isCompleted ? Icons.check : Icons.looks_one_outlined,
+                    isCompleted
+                        ? Icons.check
+                        : !canActivate
+                        ? Icons.lock
+                        : _getStepIcon(stepNumber),
                     color: Colors.white,
-                    size: 20,
+                    size: 18,
                   ),
                 ),
 
@@ -244,16 +279,22 @@ class _WorkflowStep extends StatelessWidget {
                         ).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color:
-                              isActive || isCompleted ? null : Colors.grey[600],
+                              effectivelyActive || isCompleted
+                                  ? null
+                                  : Colors.grey[600],
                         ),
                       ),
                       Text(
-                        subtitle,
+                        inactiveReason ?? subtitle,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color:
-                              isActive || isCompleted
+                              effectivelyActive || isCompleted
                                   ? Colors.grey[600]
                                   : Colors.grey[500],
+                          fontStyle:
+                              inactiveReason != null
+                                  ? FontStyle.italic
+                                  : FontStyle.normal,
                         ),
                       ),
                     ],
@@ -263,21 +304,41 @@ class _WorkflowStep extends StatelessWidget {
                 // Status indicator
                 if (isCompleted)
                   Icon(Icons.check_circle, color: Colors.green, size: 24)
-                else if (isActive)
+                else if (effectivelyActive)
                   Icon(
                     Icons.play_circle_outline,
                     color: Theme.of(context).colorScheme.primary,
                     size: 24,
-                  ),
+                  )
+                else if (!canActivate)
+                  Icon(Icons.lock, color: Colors.grey[400], size: 24),
               ],
             ),
 
             // Step content
-            if (child != null) ...[const SizedBox(height: 16), child!],
+            if (child != null && effectivelyActive) ...[
+              const SizedBox(height: 16),
+              child!,
+            ],
           ],
         ),
       ),
     );
+  }
+
+  IconData _getStepIcon(int stepNumber) {
+    switch (stepNumber) {
+      case 1:
+        return Icons.map;
+      case 2:
+        return Icons.preview;
+      case 3:
+        return Icons.palette;
+      case 4:
+        return Icons.download;
+      default:
+        return Icons.circle;
+    }
   }
 }
 

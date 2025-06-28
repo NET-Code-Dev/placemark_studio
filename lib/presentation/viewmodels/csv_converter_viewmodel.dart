@@ -123,80 +123,146 @@ class CsvConverterViewModel extends BaseViewModel {
 
   /// Auto-detect column mappings based on common naming patterns
   ColumnMapping _detectColumnMapping() {
-    if (_csvData == null) return ColumnMapping.empty();
+    if (_csvData == null || _csvData!.headers.isEmpty) {
+      return ColumnMapping.empty();
+    }
 
-    final headers = _csvData!.headers.map((h) => h.toLowerCase()).toList();
+    final headers = _csvData!.headers;
 
-    // Detect latitude column
+    if (kDebugMode) {
+      print('=== COLUMN MAPPING DETECTION ===');
+      print('Total headers: ${headers.length}');
+      print(
+        'Headers: ${headers.take(10).join(', ')}${headers.length > 10 ? '...' : ''}',
+      );
+    }
+
+    // If we only have one header, the CSV parsing failed
+    if (headers.length == 1) {
+      if (kDebugMode) {
+        print('WARNING: Only 1 column detected. CSV parsing may have failed.');
+        print('Single header content: ${headers.first}');
+      }
+      return ColumnMapping.empty();
+    }
+
     String? latitudeColumn;
-    for (int i = 0; i < headers.length; i++) {
-      final header = headers[i];
-      if (header.contains('lat') ||
-          header == 'y' ||
-          header.contains('latitude')) {
-        latitudeColumn = _csvData!.headers[i];
-        break;
-      }
-    }
-
-    // Detect longitude column
     String? longitudeColumn;
-    for (int i = 0; i < headers.length; i++) {
-      final header = headers[i];
-      if (header.contains('lon') ||
-          header.contains('lng') ||
-          header == 'x' ||
-          header.contains('longitude')) {
-        longitudeColumn = _csvData!.headers[i];
-        break;
-      }
-    }
-
-    // Detect name column
     String? nameColumn;
-    for (int i = 0; i < headers.length; i++) {
-      final header = headers[i];
-      if (header.contains('name') ||
-          header.contains('title') ||
-          header.contains('label')) {
-        nameColumn = _csvData!.headers[i];
-        break;
-      }
-    }
-
-    // Detect elevation column
     String? elevationColumn;
-    for (int i = 0; i < headers.length; i++) {
-      final header = headers[i];
-      if (header.contains('elevation') ||
-          header.contains('altitude') ||
-          header.contains('height') ||
-          header == 'z') {
-        elevationColumn = _csvData!.headers[i];
-        break;
-      }
-    }
-
-    // Detect description column
     String? descriptionColumn;
-    for (int i = 0; i < headers.length; i++) {
-      final header = headers[i];
-      if (header.contains('description') ||
-          header.contains('desc') ||
-          header.contains('notes') ||
-          header.contains('comment')) {
-        descriptionColumn = _csvData!.headers[i];
+
+    // Search for latitude column
+    for (final header in headers) {
+      final lowerHeader = header.toLowerCase().trim();
+      if (_isLatitudeColumn(lowerHeader)) {
+        latitudeColumn = header;
+        if (kDebugMode) print('Detected latitude column: $header');
         break;
       }
     }
 
-    return ColumnMapping(
+    // Search for longitude column
+    for (final header in headers) {
+      final lowerHeader = header.toLowerCase().trim();
+      if (_isLongitudeColumn(lowerHeader)) {
+        longitudeColumn = header;
+        if (kDebugMode) print('Detected longitude column: $header');
+        break;
+      }
+    }
+
+    // Search for name column
+    for (final header in headers) {
+      final lowerHeader = header.toLowerCase().trim();
+      if (_isNameColumn(lowerHeader)) {
+        nameColumn = header;
+        if (kDebugMode) print('Detected name column: $header');
+        break;
+      }
+    }
+
+    // Search for elevation column
+    for (final header in headers) {
+      final lowerHeader = header.toLowerCase().trim();
+      if (_isElevationColumn(lowerHeader)) {
+        elevationColumn = header;
+        if (kDebugMode) print('Detected elevation column: $header');
+        break;
+      }
+    }
+
+    // Search for description column
+    for (final header in headers) {
+      final lowerHeader = header.toLowerCase().trim();
+      if (_isDescriptionColumn(lowerHeader)) {
+        descriptionColumn = header;
+        if (kDebugMode) print('Detected description column: $header');
+        break;
+      }
+    }
+
+    final mapping = ColumnMapping(
       latitudeColumn: latitudeColumn,
       longitudeColumn: longitudeColumn,
       nameColumn: nameColumn,
       elevationColumn: elevationColumn,
       descriptionColumn: descriptionColumn,
     );
+
+    if (kDebugMode) {
+      print(
+        'Final mapping: lat=$latitudeColumn, lon=$longitudeColumn, name=$nameColumn',
+      );
+      print('Mapping is valid: ${mapping.isValid}');
+    }
+
+    return mapping;
+  }
+
+  bool _isLatitudeColumn(String header) {
+    return header == 'latitude' ||
+        header == 'lat' ||
+        header == 'y' ||
+        header.contains('lat') && !header.contains('lon') ||
+        header == 'northing';
+  }
+
+  bool _isLongitudeColumn(String header) {
+    return header == 'longitude' ||
+        header == 'lon' ||
+        header == 'lng' ||
+        header == 'long' ||
+        header == 'x' ||
+        header.contains('lon') && !header.contains('lat') ||
+        header == 'easting';
+  }
+
+  bool _isNameColumn(String header) {
+    return header == 'name' ||
+        header == 'title' ||
+        header == 'label' ||
+        header == 'point_name' ||
+        header == 'site_name' ||
+        header.contains('name') ||
+        header.contains('title') ||
+        header.contains('label');
+  }
+
+  bool _isElevationColumn(String header) {
+    return header == 'elevation' ||
+        header == 'altitude' ||
+        header == 'height' ||
+        header == 'z' ||
+        header.contains('elev') ||
+        header.contains('alt') ||
+        header.contains('height');
+  }
+
+  bool _isDescriptionColumn(String header) {
+    return header == 'description' ||
+        header == 'desc' ||
+        header.contains('desc');
   }
 
   /// Update column mapping
@@ -204,8 +270,13 @@ class CsvConverterViewModel extends BaseViewModel {
     _columnMapping = mapping;
 
     // Validate coordinates if mapping is complete
-    if (mapping.isValid && _csvData != null) {
+    if (mapping.hasCoordinates && _csvData != null) {
       _validateCoordinates();
+    } else {
+      // Clear validation if mapping is incomplete
+      if (_csvData != null) {
+        _csvData = _csvData!.copyWith(validationErrors: [], validRowCount: 0);
+      }
     }
 
     notifyListeners();
@@ -219,14 +290,44 @@ class CsvConverterViewModel extends BaseViewModel {
       _csvData = _csvData!.validateCoordinates(_columnMapping!);
 
       if (_csvData!.hasValidCoordinates) {
-        _successMessage =
-            'Coordinates validated successfully. ${_csvData!.validRowCount} valid rows found.';
+        final validCount = _csvData!.validRowCount;
+        final totalCount = _csvData!.totalRowCount;
+        final errorCount = _csvData!.validationErrors.length;
+
+        if (errorCount == 0) {
+          _successMessage = 'All $validCount rows have valid coordinates!';
+        } else {
+          _successMessage =
+              '$validCount of $totalCount rows have valid coordinates.';
+        }
+
+        // Clear any previous errors since we have valid data
+        clearError();
       } else {
-        setError('No valid coordinates found in the CSV data.');
+        setError(
+          'No valid coordinates found in the CSV data. Please check your column mapping and data format.',
+        );
       }
     } catch (e) {
       setError('Coordinate validation failed: ${e.toString()}');
     }
+  }
+
+  /// Manual validation trigger for user-initiated validation
+  void validateData() {
+    if (_csvData == null || _columnMapping == null) {
+      setError('No data or column mapping available for validation');
+      return;
+    }
+
+    if (!_columnMapping!.hasCoordinates) {
+      setError(
+        'Please map both latitude and longitude columns before validation',
+      );
+      return;
+    }
+
+    _validateCoordinates();
   }
 
   /// Advance to next step

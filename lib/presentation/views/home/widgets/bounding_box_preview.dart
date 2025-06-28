@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../viewmodels/home_viewmodel.dart';
@@ -79,27 +80,29 @@ class _InteractiveBoundingBoxMapState
   void initState() {
     super.initState();
     // Debug: Print the bounding box values
-    print('=== BOUNDING BOX DEBUG ===');
-    print(
-      'North-West: ${widget.boundingBox.northWest.latitude}, ${widget.boundingBox.northWest.longitude}',
-    );
-    print(
-      'North-East: ${widget.boundingBox.northEast.latitude}, ${widget.boundingBox.northEast.longitude}',
-    );
-    print(
-      'South-West: ${widget.boundingBox.southWest.latitude}, ${widget.boundingBox.southWest.longitude}',
-    );
-    print(
-      'South-East: ${widget.boundingBox.southEast.latitude}, ${widget.boundingBox.southEast.longitude}',
-    );
-    print(
-      'Center: ${widget.boundingBox.center.latitude}, ${widget.boundingBox.center.longitude}',
-    );
-    print(
-      'Width: ${widget.boundingBox.width}°, Height: ${widget.boundingBox.height}°',
-    );
-    print('========================');
+    if (kDebugMode) {
+      print('=== BOUNDING BOX DEBUG ===');
 
+      print(
+        'North-West: ${widget.boundingBox.northWest.latitude}, ${widget.boundingBox.northWest.longitude}',
+      );
+      print(
+        'North-East: ${widget.boundingBox.northEast.latitude}, ${widget.boundingBox.northEast.longitude}',
+      );
+      print(
+        'South-West: ${widget.boundingBox.southWest.latitude}, ${widget.boundingBox.southWest.longitude}',
+      );
+      print(
+        'South-East: ${widget.boundingBox.southEast.latitude}, ${widget.boundingBox.southEast.longitude}',
+      );
+      print(
+        'Center: ${widget.boundingBox.center.latitude}, ${widget.boundingBox.center.longitude}',
+      );
+      print(
+        'Width: ${widget.boundingBox.width}°, Height: ${widget.boundingBox.height}°',
+      );
+      print('========================');
+    }
     // Calculate center more reliably
     final centerLat =
         (widget.boundingBox.northWest.latitude +
@@ -117,7 +120,9 @@ class _InteractiveBoundingBoxMapState
         centerLat > 90 ||
         centerLon < -180 ||
         centerLon > 180) {
-      print('WARNING: Invalid center coordinates, using fallback');
+      if (kDebugMode) {
+        print('WARNING: Invalid center coordinates, using fallback');
+      }
       _center = const Coordinate(longitude: 0, latitude: 0);
     } else {
       _center = Coordinate(longitude: centerLon, latitude: centerLat);
@@ -194,19 +199,21 @@ class _InteractiveBoundingBoxMapState
             widget.boundingBox.southEast.longitude) /
         2;
 
-    print('=== CENTER CALCULATION ===');
-    print(
-      'NW: ${widget.boundingBox.northWest.latitude}, ${widget.boundingBox.northWest.longitude}',
-    );
-    print(
-      'SE: ${widget.boundingBox.southEast.latitude}, ${widget.boundingBox.southEast.longitude}',
-    );
-    print('Calculated Center: $centerLat, $centerLon');
-    print(
-      'BoundingBox Center: ${widget.boundingBox.center.latitude}, ${widget.boundingBox.center.longitude}',
-    );
-    print('========================');
+    if (kDebugMode) {
+      print('=== CENTER CALCULATION ===');
 
+      print(
+        'NW: ${widget.boundingBox.northWest.latitude}, ${widget.boundingBox.northWest.longitude}',
+      );
+      print(
+        'SE: ${widget.boundingBox.southEast.latitude}, ${widget.boundingBox.southEast.longitude}',
+      );
+      print('Calculated Center: $centerLat, $centerLon');
+      print(
+        'BoundingBox Center: ${widget.boundingBox.center.latitude}, ${widget.boundingBox.center.longitude}',
+      );
+      print('========================');
+    }
     setState(() {
       _center = Coordinate(longitude: centerLon, latitude: centerLat);
       _isLoading = true;
@@ -572,8 +579,8 @@ class _BoundingBoxOverlayPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     // Convert coordinates to pixel positions
-    final centerPixelX = size.width / 2;
-    final centerPixelY = size.height / 2;
+    //  final centerPixelX = size.width / 2;
+    //  final centerPixelY = size.height / 2;
 
     // Calculate pixel positions for bounding box corners
     final nwPixel = _coordinateToPixel(boundingBox.northWest, size);

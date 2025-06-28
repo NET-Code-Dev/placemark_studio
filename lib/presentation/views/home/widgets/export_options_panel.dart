@@ -127,8 +127,7 @@ class _LayerSeparationOption extends StatelessWidget {
       builder: (context, viewModel, child) {
         final kmlData = viewModel.kmlData!;
         final hasHierarchy = kmlData.hasHierarchy;
-        final folderCount =
-            hasHierarchy ? kmlData.totalFolderCount : kmlData.layersCount;
+        //  final folderCount = hasHierarchy ? kmlData.totalFolderCount : kmlData.layersCount;
         final layersWithData =
             hasHierarchy
                 ? _countFoldersWithPlacemarks(kmlData.folderStructure!)

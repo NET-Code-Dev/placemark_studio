@@ -333,7 +333,7 @@ class _HierarchyPreview extends StatelessWidget {
                   ],
                 ),
               );
-            }).toList(),
+            }),
           ],
         ),
       ),
