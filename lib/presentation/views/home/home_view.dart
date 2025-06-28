@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../core/di/service_locator.dart';
 import '../../viewmodels/home_viewmodel.dart';
 import 'widgets/file_selection_card.dart';
+import 'widgets/converter_grid.dart';
 import 'widgets/file_info_panel.dart';
 import 'widgets/bounding_box_preview.dart';
 import 'widgets/export_options_panel.dart';
@@ -94,7 +95,7 @@ class _NoDataView extends StatelessWidget {
     return const Center(
       child: SingleChildScrollView(
         padding: EdgeInsets.all(16),
-        child: FileSelectionCard(),
+        child: ConverterGrid(), // New grid layout
       ),
     );
   }
@@ -119,9 +120,7 @@ class _DataLoadedView extends StatelessWidget {
                   flex: 2, // 2/3 width for bounding box
                   child: BoundingBoxPreview(),
                 ),
-                //             const SizedBox(width: 5), // Spacing between left and right
                 Expanded(flex: 1, child: FileInfoPanel()),
-                //               const SizedBox(width: 5),
                 Expanded(flex: 1, child: ExportOptionsPanel()),
               ],
             ),

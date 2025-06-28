@@ -3,16 +3,19 @@ import 'package:placemark_studio/data/services/unified_file_parser_service.dart'
 import '../../data/services/file_picker_service.dart';
 import '../../data/services/kml_parser_service.dart';
 import '../../data/services/csv_export_service.dart';
+import '../../data/services/csv_parser_service.dart';
+import '../../data/services/kml_generation_service.dart';
 import '../../data/services/bounding_box_service.dart';
 import '../../presentation/viewmodels/home_viewmodel.dart';
 import '../../presentation/viewmodels/extract_viewmodel.dart';
 import '../../presentation/viewmodels/create_viewmodel.dart';
+import '../../presentation/viewmodels/csv_converter_viewmodel.dart';
 
 final GetIt getIt = GetIt.instance;
 
 class ServiceLocator {
   static Future<void> init() async {
-    // Services
+    // Core Services
     getIt.registerLazySingleton<IFilePickerService>(() => FilePickerService());
     getIt.registerLazySingleton<IKmlParserService>(() => KmlParserService());
     getIt.registerLazySingleton<IUnifiedFileParserService>(
@@ -25,12 +28,17 @@ class ServiceLocator {
       () => BoundingBoxService(),
     );
 
-    // ViewModels
+    // New CSV Services
+    getIt.registerLazySingleton<ICsvParserService>(() => CsvParserService());
+    getIt.registerLazySingleton<IKmlGenerationService>(
+      () => KmlGenerationService(),
+    );
+
+    // Existing ViewModels
     getIt.registerFactory<HomeViewModel>(
       () => HomeViewModel(
         filePickerService: getIt<IFilePickerService>(),
-        kmlParserService:
-            getIt<IUnifiedFileParserService>(), // Use unified parser
+        kmlParserService: getIt<IUnifiedFileParserService>(),
         csvExportService: getIt<ICsvExportService>(),
       ),
     );
@@ -40,6 +48,14 @@ class ServiceLocator {
     );
 
     getIt.registerFactory<CreateViewModel>(() => CreateViewModel());
+
+    // New CSV Converter ViewModel
+    getIt.registerFactory<CsvConverterViewModel>(
+      () => CsvConverterViewModel(
+        csvParserService: getIt<ICsvParserService>(),
+        kmlGenerationService: getIt<IKmlGenerationService>(),
+      ),
+    );
   }
 
   static void reset() {

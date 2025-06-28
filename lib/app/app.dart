@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../app/themes/app_theme.dart';
-import '../presentation/views/home/home_view.dart';
+import '../app/routes/route_generator.dart';
 
 class PlacemarkStudioApp extends StatelessWidget {
   const PlacemarkStudioApp({super.key});
@@ -8,12 +8,13 @@ class PlacemarkStudioApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Placemark Studio - KML Converter',
+      title: 'Placemark Studio - File Converter',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.light,
-      home: const HomeView(),
+      initialRoute: '/',
+      onGenerateRoute: RouteGenerator.generateRoute,
     );
   }
 }
