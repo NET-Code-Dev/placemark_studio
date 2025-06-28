@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../viewmodels/home_viewmodel.dart';
 import '../../../../core/enums/converter_type.dart';
-import 'file_selection_card.dart';
+import '../../../../core/enums/converter_mode.dart';
+import '../../../viewmodels/home_viewmodel.dart';
 
 class ConverterGrid extends StatelessWidget {
   const ConverterGrid({super.key});
@@ -178,8 +178,8 @@ class _ConverterCardState extends State<_ConverterCard>
 
     switch (widget.type) {
       case ConverterType.kmlToCsv:
-        // Trigger existing KML file picker
-        viewModel.pickFile();
+        // Set the converter mode and let the home view show the file selection card
+        viewModel.setConverterMode(ConverterMode.kmlToCsv);
         break;
       case ConverterType.csvToKml:
         // Navigate to CSV converter

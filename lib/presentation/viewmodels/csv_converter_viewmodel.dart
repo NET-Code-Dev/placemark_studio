@@ -8,15 +8,8 @@ import '../../../data/services/kml_generation_service.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/enums/geometry_type.dart';
 import '../../../core/enums/export_format.dart';
+import '../../../core/enums/conversion_step.dart';
 import 'base_viewmodel.dart';
-
-enum ConversionStep {
-  fileSelection,
-  columnMapping,
-  dataPreview,
-  geometryAndStyling,
-  exportOptions,
-}
 
 class CsvConverterViewModel extends BaseViewModel {
   final ICsvParserService _csvParserService;
@@ -79,6 +72,24 @@ class CsvConverterViewModel extends BaseViewModel {
       } else {
         setIdle();
       }
+    } on AppException catch (e) {
+      setError(e.message, e);
+    } catch (e) {
+      setError('Failed to process CSV file: ${e.toString()}');
+    }
+  }
+
+  /// Handle dropped CSV file (for drag and drop)
+  Future<void> processCsvFile(File file) async {
+    try {
+      clearError();
+      _successMessage = null;
+      setLoading();
+
+      _selectedFile = file;
+      await _processCsvFile();
+      _currentStep = ConversionStep.columnMapping;
+      setSuccess();
     } on AppException catch (e) {
       setError(e.message, e);
     } catch (e) {

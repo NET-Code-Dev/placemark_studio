@@ -1,37 +1,44 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../../viewmodels/home_viewmodel.dart';
 
 class StatusMessageCard extends StatelessWidget {
-  const StatusMessageCard({super.key});
+  final bool hasError;
+  final String? errorMessage;
+  final String? successMessage;
+  final VoidCallback? onDismissError;
+  final VoidCallback? onDismissSuccess;
+
+  const StatusMessageCard({
+    super.key,
+    this.hasError = false,
+    this.errorMessage,
+    this.successMessage,
+    this.onDismissError,
+    this.onDismissSuccess,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<HomeViewModel>(
-      builder: (context, viewModel, child) {
-        if (viewModel.hasError) {
-          return _MessageCard(
-            icon: Icons.error,
-            message: viewModel.errorMessage ?? 'An error occurred',
-            color: Colors.red,
-            backgroundColor: Colors.red.shade50,
-            onDismiss: viewModel.clearError,
-          );
-        }
+    if (hasError && errorMessage != null) {
+      return _MessageCard(
+        icon: Icons.error,
+        message: errorMessage!,
+        color: Colors.red,
+        backgroundColor: Colors.red.shade50,
+        onDismiss: onDismissError,
+      );
+    }
 
-        if (viewModel.successMessage != null) {
-          return _MessageCard(
-            icon: Icons.check_circle,
-            message: viewModel.successMessage!,
-            color: Colors.green,
-            backgroundColor: Colors.green.shade50,
-            onDismiss: viewModel.clearMessages,
-          );
-        }
+    if (successMessage != null && successMessage!.isNotEmpty) {
+      return _MessageCard(
+        icon: Icons.check_circle,
+        message: successMessage!,
+        color: Colors.green,
+        backgroundColor: Colors.green.shade50,
+        onDismiss: onDismissSuccess,
+      );
+    }
 
-        return const SizedBox.shrink();
-      },
-    );
+    return const SizedBox.shrink();
   }
 }
 

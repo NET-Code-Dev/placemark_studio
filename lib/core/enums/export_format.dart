@@ -24,7 +24,9 @@ enum ExportFormat {
   svg('SVG', 'Scalable Vector Graphics', '.svg'),
   topoJson('TopoJSON', 'TopoJSON', '.topojson'),
   wkt('WKT', 'Well-Known text (.csv + WKT column)', '.csv'),
-  xlsx('XLSX', 'MS Office Open XML spreadsheet', '.xlsx');
+  xlsx('XLSX', 'MS Office Open XML spreadsheet', '.xlsx'),
+  kml('KML', 'Keyhole Markup Language', '.kml'),
+  kmz('KMZ', 'Compressed KML Archive', '.kmz');
 
   const ExportFormat(this.code, this.description, this.extension);
   final String code;
@@ -39,7 +41,15 @@ enum ExportFormat {
   }
 
   bool get isSupported {
-    // For now, only CSV is fully implemented
-    return this == ExportFormat.csv;
+    // For now, only CSV, KML, and KMZ are fully implemented
+    return this == ExportFormat.csv ||
+        this == ExportFormat.kml ||
+        this == ExportFormat.kmz;
   }
+
+  bool get isSupportedForCsvConversion {
+    return this == ExportFormat.kml || this == ExportFormat.kmz;
+  }
+
+  String get displayName => code;
 }

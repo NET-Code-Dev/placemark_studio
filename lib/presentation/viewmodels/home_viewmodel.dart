@@ -16,6 +16,7 @@ import '../../data/models/export_options.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/errors/app_exception.dart';
 import '../../core/enums/export_format.dart';
+import '../../core/enums/converter_mode.dart';
 import 'base_viewmodel.dart';
 
 class HomeViewModel extends BaseViewModel {
@@ -42,6 +43,7 @@ class HomeViewModel extends BaseViewModel {
   final Map<String, bool> _duplicateHandling = {};
   bool _separateLayers = false;
   bool _useSimpleFileNaming = false;
+  ConverterMode _converterMode = ConverterMode.none;
 
   // Getters
   File? get selectedFile => _selectedFile;
@@ -66,6 +68,10 @@ class HomeViewModel extends BaseViewModel {
 
   List<ExportFormat> get supportedFormats =>
       ExportFormat.values.where((f) => f.isSupported).toList();
+
+  ConverterMode get converterMode => _converterMode;
+  bool get isInFileSelectionMode =>
+      _converterMode != ConverterMode.none && !hasKmlData;
 
   Future<void> _updateWindowTitle([String? fileName]) async {
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
@@ -311,6 +317,73 @@ class HomeViewModel extends BaseViewModel {
     }
   }
 
+  Future<void> processKmlFile(File file) async {
+    try {
+      clearError();
+      _successMessage = null;
+      setLoading();
+
+      // Validate file
+      if (!await file.exists()) {
+        throw FileProcessingException(
+          'File does not exist',
+          code: 'FILE_NOT_FOUND',
+        );
+      }
+
+      // Check file extension
+      final extension = file.path.toLowerCase().split('.').last;
+      if (!['kml', 'kmz'].contains(extension)) {
+        throw FileProcessingException(
+          'Unsupported file format. Please select a KML or KMZ file.',
+          code: 'INVALID_FILE_FORMAT',
+        );
+      }
+
+      // Check file size
+      final stat = await file.stat();
+      if (stat.size > AppConstants.maxFileSizeBytes) {
+        throw FileProcessingException(
+          'File is too large. Maximum size is ${AppConstants.maxFileSizeBytes / (1024 * 1024)}MB.',
+          code: 'FILE_TOO_LARGE',
+        );
+      }
+
+      // Process the file using the existing service
+      _selectedFile = file;
+      _kmlData = await _fileParserService.parseFile(file);
+
+      // Detect duplicate headers
+      _duplicateHeaders = _csvExportService.detectDuplicateHeaders(_kmlData!);
+
+      // Initialize duplicate handling (default to keep all)
+      _duplicateHandling.clear();
+      _duplicateHeaders?.keys.forEach((header) {
+        _duplicateHandling[header] = true;
+      });
+
+      // Generate preview data using the existing method
+      await _generatePreview();
+
+      if (kDebugMode) {
+        print('KML file processed successfully: ${file.path}');
+        print('Features: ${_kmlData!.featuresCount}');
+        print('Layers: ${_kmlData!.layersCount}');
+      }
+
+      setSuccess();
+    } on AppException catch (e) {
+      setError(e.message, e);
+    } catch (e) {
+      setError('Failed to process KML file: ${e.toString()}');
+    }
+  }
+
+  void setConverterMode(ConverterMode mode) {
+    _converterMode = mode;
+    notifyListeners();
+  }
+
   void setSelectedExportFormat(ExportFormat format) {
     if (_selectedExportFormat != format) {
       _selectedExportFormat = format;
@@ -429,53 +502,6 @@ class HomeViewModel extends BaseViewModel {
     _successMessage = 'File converted successfully!\nSaved to: $outputFilePath';
   }
 
-  /*
-  Future<void> _convertToSeparateFiles() async {
-    // Determine output directory
-    String outputDirectory;
-    if (_outputPath != null) {
-      outputDirectory = _outputPath!;
-    } else {
-      outputDirectory = path.dirname(_selectedFile!.path);
-    }
-
-    // Create folder for separate files
-    final baseName = path.basenameWithoutExtension(_selectedFile!.path);
-    final folderPath = path.join(outputDirectory, '${baseName}_layers');
-    final folder = Directory(folderPath);
-
-    if (!await folder.exists()) {
-      await folder.create();
-    }
-
-    // For now, create one file per layer (this would need layer detection logic)
-    // This is a simplified implementation - need to enhance the KML parser to
-    // properly separate layers
-
-    final layerCount = _kmlData!.layersCount;
-    final filesCreated = <String>[];
-
-    for (int i = 1; i <= layerCount; i++) {
-      final layerFileName = 'layer_$i${_selectedExportFormat.extension}';
-      final layerFilePath = path.join(folderPath, layerFileName);
-
-      // For now, just create the main file for each "layer"
-      // In a full implementation, filter placemarks by layer
-      final exportOptions = ExportOptions(
-        format: _selectedExportFormat,
-        outputPath: layerFilePath,
-      );
-
-      await _exportToCsv(exportOptions, layerFilePath);
-      filesCreated.add(layerFileName);
-    }
-
-    _successMessage =
-        'Files converted successfully!\n'
-        'Created ${filesCreated.length} files in: $folderPath\n'
-        'Files: ${filesCreated.join(', ')}';
-  }
-*/
   Future<void> _convertToSeparateFiles() async {
     if (_kmlData == null) {
       throw ConversionException('No KML data available for conversion');
@@ -908,6 +934,7 @@ class HomeViewModel extends BaseViewModel {
     _duplicateHandling.clear();
     _separateLayers = false;
     _useSimpleFileNaming = false;
+    _converterMode = ConverterMode.none;
     clearError();
 
     // Exit fullscreen and reset title asynchronously without waiting

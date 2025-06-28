@@ -77,8 +77,8 @@ class _CsvFileSelectionCardState extends State<CsvFileSelectionCard>
         return;
       }
 
-      // Process the file through the view model
-      await viewModel.handleDroppedCsvFile(fileObject);
+      // Process the file through the view model using the correct method
+      await viewModel.processCsvFile(fileObject);
     } catch (e) {
       _showErrorSnackBar('Error processing dropped file: ${e.toString()}');
     }

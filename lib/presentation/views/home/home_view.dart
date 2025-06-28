@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/di/service_locator.dart';
+import '../../../core/enums/converter_mode.dart';
 import '../../viewmodels/home_viewmodel.dart';
-import 'widgets/file_selection_card.dart';
+import 'widgets/kml_file_selection_card.dart';
 import 'widgets/converter_grid.dart';
 import 'widgets/file_info_panel.dart';
 import 'widgets/bounding_box_preview.dart';
 import 'widgets/export_options_panel.dart';
-import 'widgets/status_message_card.dart';
+import '../../../shared/widgets/status_message_card.dart';
 import 'widgets/preview_table.dart';
 
 class HomeView extends StatelessWidget {
@@ -67,9 +68,15 @@ class _HomeViewContent extends StatelessWidget {
           body: Column(
             children: [
               // Status messages (always at top)
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 0, 16, 0),
-                child: StatusMessageCard(),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                child: StatusMessageCard(
+                  hasError: viewModel.hasError,
+                  errorMessage: viewModel.errorMessage,
+                  successMessage: viewModel.successMessage,
+                  onDismissError: viewModel.clearError,
+                  onDismissSuccess: viewModel.clearMessages,
+                ),
               ),
 
               // Main content area
@@ -92,11 +99,55 @@ class _NoDataView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
-        child: ConverterGrid(), // New grid layout
-      ),
+    return Consumer<HomeViewModel>(
+      builder: (context, viewModel, child) {
+        // Show file selection card if a converter mode is selected
+        if (viewModel.isInFileSelectionMode) {
+          return Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  // Back button
+                  Row(
+                    children: [
+                      IconButton(
+                        onPressed:
+                            () =>
+                                viewModel.setConverterMode(ConverterMode.none),
+                        icon: const Icon(Icons.arrow_back),
+                        tooltip: 'Back to converter selection',
+                      ),
+                      Expanded(
+                        child: Text(
+                          viewModel.converterMode.displayName,
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Show appropriate file selection card
+                  if (viewModel.converterMode == ConverterMode.kmlToCsv)
+                    const KmlFileSelectionCard()
+                  else
+                    const SizedBox.shrink(), // Placeholder for future converters
+                ],
+              ),
+            ),
+          );
+        }
+
+        // Show converter grid if no mode is selected
+        return const Center(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(16),
+            child: ConverterGrid(),
+          ),
+        );
+      },
     );
   }
 }

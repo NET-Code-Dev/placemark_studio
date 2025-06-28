@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import '../../../core/di/service_locator.dart';
+import '../../../core/enums/conversion_step.dart';
 import '../../viewmodels/csv_converter_viewmodel.dart';
-import '../home/widgets/csv_file_selection_card.dart';
-import '../home/widgets/status_message_card.dart';
+import 'widgets/csv_file_selection_card.dart';
+import 'widgets/csv_column_mapping_panel.dart';
+import 'widgets/csv_preview_table.dart';
+import 'widgets/geometry_type_selector.dart';
+import 'widgets/styling_options_panel.dart';
+import 'widgets/kml_export_panel.dart';
+import '../../../shared/widgets/status_message_card.dart';
 
 class CsvConverterView extends StatelessWidget {
   const CsvConverterView({super.key});
