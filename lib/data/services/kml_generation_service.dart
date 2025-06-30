@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
@@ -53,11 +54,12 @@ class KmlGenerationService implements IKmlGenerationService {
 
       // Write file
       final file = File(outputPath);
-      await file.writeAsString(kmlContent);
+      await file.writeAsString(kmlContent, encoding: utf8);
 
       if (kDebugMode) {
         print('KML file generated: $outputPath');
         print('File size: ${await file.length()} bytes');
+        print('Placemarks processed: ${csvData.rows.length}');
       }
 
       return file;
@@ -87,7 +89,7 @@ class KmlGenerationService implements IKmlGenerationService {
       final archive = Archive();
 
       // Add KML file to archive
-      final kmlBytes = kmlContent.codeUnits;
+      final kmlBytes = utf8.encode(kmlContent);
       archive.addFile(ArchiveFile('doc.kml', kmlBytes.length, kmlBytes));
 
       // Add image files if provided
@@ -149,6 +151,8 @@ class KmlGenerationService implements IKmlGenerationService {
     KmlGenerationOptions options,
   ) {
     final buffer = StringBuffer();
+    int processedCount = 0;
+    int skippedCount = 0;
 
     // KML header
     buffer.writeln('<?xml version="1.0" encoding="UTF-8"?>');
@@ -159,8 +163,8 @@ class KmlGenerationService implements IKmlGenerationService {
       '<description>${_escapeXml(options.documentDescription)}</description>',
     );
 
-    // Add styles
-    _addStyles(buffer, options);
+    // Add default styles
+    _addDefaultStyles(buffer, options);
 
     // Process each row
     for (int i = 0; i < csvData.rows.length; i++) {
@@ -170,8 +174,12 @@ class KmlGenerationService implements IKmlGenerationService {
         final placemark = _createPlacemark(row, columnMapping, options, i);
         if (placemark != null) {
           buffer.writeln(placemark);
+          processedCount++;
+        } else {
+          skippedCount++;
         }
       } catch (e) {
+        skippedCount++;
         if (kDebugMode) {
           print('Warning: Skipping row ${i + 1}: ${e.toString()}');
         }
@@ -183,7 +191,54 @@ class KmlGenerationService implements IKmlGenerationService {
     buffer.writeln('</Document>');
     buffer.writeln('</kml>');
 
+    if (kDebugMode) {
+      print('KML generation completed:');
+      print('  Processed: $processedCount placemarks');
+      print('  Skipped: $skippedCount rows');
+      print(
+        '  Success rate: ${(processedCount / csvData.rows.length * 100).toStringAsFixed(1)}%',
+      );
+    }
+
     return buffer.toString();
+  }
+
+  /// Add default styles to KML document
+  void _addDefaultStyles(StringBuffer buffer, KmlGenerationOptions options) {
+    // Default point style
+    buffer.writeln('<Style id="defaultStyle">');
+    buffer.writeln('  <IconStyle>');
+    buffer.writeln('    <color>ff0000ff</color>'); // Red color
+    buffer.writeln('    <scale>1.0</scale>');
+    buffer.writeln('    <Icon>');
+    buffer.writeln(
+      '      <href>http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png</href>',
+    );
+    buffer.writeln('    </Icon>');
+    buffer.writeln('  </IconStyle>');
+    buffer.writeln('  <LabelStyle>');
+    buffer.writeln('    <color>ff000000</color>'); // Black labels
+    buffer.writeln('    <scale>0.9</scale>');
+    buffer.writeln('  </LabelStyle>');
+    buffer.writeln('</Style>');
+
+    // Add custom styles from options
+    if (options.useCustomIcons && options.styleRules.isNotEmpty) {
+      for (final entry in options.styleRules.entries) {
+        final styleId = entry.key;
+        final rule = entry.value;
+
+        buffer.writeln('<Style id="$styleId">');
+        buffer.writeln('  <IconStyle>');
+        buffer.writeln('    <color>${rule.color}</color>');
+        buffer.writeln('    <scale>1.0</scale>');
+        buffer.writeln('    <Icon>');
+        buffer.writeln('      <href>${rule.iconUrl}</href>');
+        buffer.writeln('    </Icon>');
+        buffer.writeln('  </IconStyle>');
+        buffer.writeln('</Style>');
+      }
+    }
   }
 
   /// Create a placemark from a CSV row
@@ -208,15 +263,21 @@ class KmlGenerationService implements IKmlGenerationService {
       return null; // Skip rows with invalid coordinates
     }
 
+    // Validate coordinate ranges
     if (latitude < -90 ||
         latitude > 90 ||
         longitude < -180 ||
         longitude > 180) {
+      if (kDebugMode) {
+        print(
+          'Warning: Invalid coordinate range at row ${index + 1}: lat=$latitude, lon=$longitude',
+        );
+      }
       return null; // Skip rows with out-of-range coordinates
     }
 
     final buffer = StringBuffer();
-    buffer.writeln('<Placemark>');
+    buffer.writeln('  <Placemark>');
 
     // Name
     final name =
@@ -224,23 +285,23 @@ class KmlGenerationService implements IKmlGenerationService {
             ? row[columnMapping.nameColumn]?.toString() ??
                 'Placemark ${index + 1}'
             : 'Placemark ${index + 1}';
-    buffer.writeln('<name>${_escapeXml(name)}</name>');
+    buffer.writeln('    <name>${_escapeXml(name)}</name>');
 
     // Description
     if (options.includeDescription && columnMapping.descriptionColumn != null) {
       final description =
           row[columnMapping.descriptionColumn]?.toString() ?? '';
       if (description.isNotEmpty) {
-        buffer.writeln('<description><![CDATA[$description]]></description>');
+        buffer.writeln(
+          '    <description><![CDATA[$description]]></description>',
+        );
       }
     }
 
-    // Style reference (if using custom styling)
-    if (options.useCustomIcons) {
-      final styleId = _determineStyleId(row, options);
-      if (styleId != null) {
-        buffer.writeln('<styleUrl>#$styleId</styleUrl>');
-      }
+    // Style reference
+    final styleId = _determineStyleId(row, options);
+    if (styleId != null) {
+      buffer.writeln('    <styleUrl>#$styleId</styleUrl>');
     }
 
     // Geometry
@@ -250,13 +311,13 @@ class KmlGenerationService implements IKmlGenerationService {
       elevation: _extractElevation(row, columnMapping, options),
       geometryType: options.geometryType,
     );
-    buffer.writeln(geometry);
+    buffer.write(geometry); // Note: geometry includes its own indentation
 
-    buffer.writeln('</Placemark>');
+    buffer.writeln('  </Placemark>');
     return buffer.toString();
   }
 
-  /// Create geometry element
+  /// Create geometry element based on geometry type
   String _createGeometry({
     required double latitude,
     required double longitude,
@@ -264,105 +325,51 @@ class KmlGenerationService implements IKmlGenerationService {
     required GeometryType geometryType,
   }) {
     final coords =
-        elevation != null
+        elevation != null && elevation != 0.0
             ? '$longitude,$latitude,$elevation'
             : '$longitude,$latitude';
 
     switch (geometryType) {
       case GeometryType.point:
-        return '''
-<Point>
-  <coordinates>$coords</coordinates>
-</Point>''';
+        return '''    <Point>
+      <coordinates>$coords</coordinates>
+    </Point>
+''';
 
       case GeometryType.lineString:
-        // For now, treat each point as a single-point linestring
-        // This will be enhanced in later milestones for actual paths
-        return '''
-<LineString>
-  <coordinates>$coords</coordinates>
-</LineString>''';
-
-      case GeometryType.linearRing:
-        // Create a small linear ring around the point
-        final offset = 0.0001;
-        return '''
-<LinearRing>
-  <coordinates>
-    ${longitude - offset},${latitude - offset}
-    ${longitude + offset},${latitude - offset}
-    ${longitude + offset},${latitude + offset}
-    ${longitude - offset},${latitude + offset}
-    ${longitude - offset},${latitude - offset}
-  </coordinates>
-</LinearRing>''';
+        // For single point data, we'll create a point instead
+        return '''    <Point>
+      <coordinates>$coords</coordinates>
+    </Point>
+''';
 
       case GeometryType.polygon:
-        // For now, treat each point as a very small polygon
-        // This will be enhanced in later milestones for actual polygons
-        final offset = 0.0001; // Small offset for square
-        return '''
-<Polygon>
-  <outerBoundaryIs>
-    <LinearRing>
-      <coordinates>
-        ${longitude - offset},${latitude - offset}
-        ${longitude + offset},${latitude - offset}
-        ${longitude + offset},${latitude + offset}
-        ${longitude - offset},${latitude + offset}
-        ${longitude - offset},${latitude - offset}
-      </coordinates>
-    </LinearRing>
-  </outerBoundaryIs>
-</Polygon>''';
+        // For single point data, we'll create a point instead
+        return '''    <Point>
+      <coordinates>$coords</coordinates>
+    </Point>
+''';
+
+      case GeometryType.linearRing:
+        // For single point data, we'll create a point instead
+        return '''    <Point>
+      <coordinates>$coords</coordinates>
+    </Point>
+''';
 
       case GeometryType.multiGeometry:
-        // For now, just create a point within multigeometry
-        // This will be enhanced in later milestones
-        return '''
-<MultiGeometry>
-  <Point>
-    <coordinates>$coords</coordinates>
-  </Point>
-</MultiGeometry>''';
+        // For single point data, we'll create a point instead
+        return '''    <Point>
+      <coordinates>$coords</coordinates>
+    </Point>
+''';
 
       case GeometryType.model:
-        // Models aren't supported for CSV conversion, fall back to point
-        return '''
-<Point>
-  <coordinates>$coords</coordinates>
-</Point>''';
-    }
-  }
-
-  /// Add style definitions to KML
-  void _addStyles(StringBuffer buffer, KmlGenerationOptions options) {
-    // Add default style
-    buffer.writeln('''
-<Style id="defaultStyle">
-  <IconStyle>
-    <Icon>
-      <href>${options.defaultIconStyle}</href>
-    </Icon>
-    <scale>1.0</scale>
-  </IconStyle>
-</Style>''');
-
-    // Add custom styles based on rules
-    for (final entry in options.styleRules.entries) {
-      final styleId = entry.key;
-      final rule = entry.value;
-
-      buffer.writeln('''
-<Style id="$styleId">
-  <IconStyle>
-    <Icon>
-      <href>${rule.iconUrl}</href>
-    </Icon>
-    <scale>${rule.scale}</scale>
-    <color>${rule.color}</color>
-  </IconStyle>
-</Style>''');
+        // For single point data, we'll create a point instead
+        return '''    <Point>
+      <coordinates>$coords</coordinates>
+    </Point>
+''';
     }
   }
 
@@ -371,6 +378,11 @@ class KmlGenerationService implements IKmlGenerationService {
     Map<String, dynamic> row,
     KmlGenerationOptions options,
   ) {
+    if (!options.useCustomIcons || options.styleRules.isEmpty) {
+      return 'defaultStyle';
+    }
+
+    // Check style rules
     for (final entry in options.styleRules.entries) {
       final styleId = entry.key;
       final rule = entry.value;
@@ -398,7 +410,7 @@ class KmlGenerationService implements IKmlGenerationService {
     return _parseCoordinate(elevValue);
   }
 
-  /// Parse coordinate value
+  /// Parse coordinate value from various formats
   double? _parseCoordinate(dynamic value) {
     if (value == null) return null;
 
@@ -409,8 +421,22 @@ class KmlGenerationService implements IKmlGenerationService {
       final stringValue = value.toString().trim();
       if (stringValue.isEmpty) return null;
 
-      return double.tryParse(stringValue);
+      // Handle common coordinate formats
+      final cleanValue =
+          stringValue
+              .replaceAll(
+                RegExp(r'[^\d\-\+\.]'),
+                '',
+              ) // Remove non-numeric chars except -+.
+              .trim();
+
+      if (cleanValue.isEmpty) return null;
+
+      return double.tryParse(cleanValue);
     } catch (e) {
+      if (kDebugMode) {
+        print('Warning: Failed to parse coordinate: $value');
+      }
       return null;
     }
   }
@@ -431,22 +457,32 @@ class KmlGenerationService implements IKmlGenerationService {
     KmlGenerationOptions options, {
     bool isKmz = false,
   }) {
-    if (options.outputPath != null) {
+    if (options.outputPath != null && options.outputPath!.isNotEmpty) {
       return options.outputPath!;
     }
 
     // Generate default path based on input file
     final baseName = path.basenameWithoutExtension(inputFileName);
     final extension = isKmz ? '.kmz' : '.kml';
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
 
     // Use Downloads directory as default
-    final downloadsPath = path.join(
-      Platform.environment['USERPROFILE'] ??
-          Platform.environment['HOME'] ??
-          '.',
-      'Downloads',
-    );
+    String downloadsPath;
 
-    return path.join(downloadsPath, '$baseName$extension');
+    if (Platform.isWindows) {
+      downloadsPath = path.join(
+        Platform.environment['USERPROFILE'] ?? '.',
+        'Downloads',
+      );
+    } else {
+      downloadsPath = path.join(
+        Platform.environment['HOME'] ?? '.',
+        'Downloads',
+      );
+    }
+
+    // Create unique filename to avoid conflicts
+    final fileName = '${baseName}_converted_$timestamp$extension';
+    return path.join(downloadsPath, fileName);
   }
 }

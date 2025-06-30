@@ -1,7 +1,7 @@
-import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'column_mapping.dart';
 
-class CsvData extends Equatable {
+class CsvData {
   final String fileName;
   final List<String> headers;
   final List<Map<String, dynamic>> rows;
@@ -16,24 +16,16 @@ class CsvData extends Equatable {
     this.validRowCount = 0,
   });
 
-  factory CsvData.empty() {
-    return const CsvData(fileName: '', headers: [], rows: []);
-  }
-
-  bool get hasData => rows.isNotEmpty;
-  bool get hasValidCoordinates => validRowCount > 0;
-  bool get hasValidationErrors => validationErrors.isNotEmpty;
+  // Core getters
   int get totalRowCount => rows.length;
+  bool get hasValidCoordinates => validRowCount > 0;
+  bool get isEmpty => rows.isEmpty;
+  bool get isNotEmpty => rows.isNotEmpty;
 
-  /// Validate coordinates based on column mapping
+  /// Validate coordinate data against column mapping
   CsvData validateCoordinates(ColumnMapping mapping) {
-    if (!mapping.hasCoordinates) {
-      return copyWith(
-        validationErrors: [
-          'Cannot validate coordinates: latitude and longitude columns must be mapped',
-        ],
-        validRowCount: 0,
-      );
+    if (!mapping.isValid || rows.isEmpty) {
+      return copyWith(validationErrors: [], validRowCount: 0);
     }
 
     final errors = <String>[];
@@ -219,11 +211,7 @@ class CsvData extends Equatable {
   }
 
   @override
-  List<Object?> get props => [
-    fileName,
-    headers,
-    rows,
-    validationErrors,
-    validRowCount,
-  ];
+  String toString() {
+    return 'CsvData(fileName: $fileName, rows: ${rows.length}, headers: ${headers.length})';
+  }
 }
