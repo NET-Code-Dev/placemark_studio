@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'column_mapping.dart';
 
 class CsvData {

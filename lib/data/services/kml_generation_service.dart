@@ -60,6 +60,7 @@ class KmlGenerationService implements IKmlGenerationService {
         print('KML file generated: $outputPath');
         print('File size: ${await file.length()} bytes');
         print('Placemarks processed: ${csvData.rows.length}');
+        print('Geometry type: ${options.geometryType.displayName}');
       }
 
       return file;
@@ -163,15 +164,86 @@ class KmlGenerationService implements IKmlGenerationService {
       '<description>${_escapeXml(options.documentDescription)}</description>',
     );
 
-    // Add default styles
-    _addDefaultStyles(buffer, options);
+    // Add styles
+    _addStyles(buffer, options);
 
-    // Process each row
+    // Generate geometry based on type
+    switch (options.geometryType) {
+      case GeometryType.point:
+        _generatePointPlacemarks(buffer, csvData, columnMapping, options, (
+          processed,
+          skipped,
+        ) {
+          processedCount = processed;
+          skippedCount = skipped;
+        });
+        break;
+
+      case GeometryType.lineString:
+        _generateLineStringPlacemark(buffer, csvData, columnMapping, options, (
+          processed,
+          skipped,
+        ) {
+          processedCount = processed;
+          skippedCount = skipped;
+        });
+        break;
+
+      case GeometryType.polygon:
+        _generatePolygonPlacemark(buffer, csvData, columnMapping, options, (
+          processed,
+          skipped,
+        ) {
+          processedCount = processed;
+          skippedCount = skipped;
+        });
+        break;
+
+      default:
+        // Fallback to points for unsupported geometry types
+        _generatePointPlacemarks(buffer, csvData, columnMapping, options, (
+          processed,
+          skipped,
+        ) {
+          processedCount = processed;
+          skippedCount = skipped;
+        });
+        break;
+    }
+
+    // KML footer
+    buffer.writeln('</Document>');
+    buffer.writeln('</kml>');
+
+    if (kDebugMode) {
+      print('KML generation completed:');
+      print('  Geometry type: ${options.geometryType.displayName}');
+      print('  Processed: $processedCount features');
+      print('  Skipped: $skippedCount rows');
+      print(
+        '  Success rate: ${(processedCount / csvData.rows.length * 100).toStringAsFixed(1)}%',
+      );
+    }
+
+    return buffer.toString();
+  }
+
+  /// Generate individual point placemarks from CSV rows
+  void _generatePointPlacemarks(
+    StringBuffer buffer,
+    CsvData csvData,
+    ColumnMapping columnMapping,
+    KmlGenerationOptions options,
+    Function(int processed, int skipped) onStats,
+  ) {
+    int processedCount = 0;
+    int skippedCount = 0;
+
     for (int i = 0; i < csvData.rows.length; i++) {
       final row = csvData.rows[i];
 
       try {
-        final placemark = _createPlacemark(row, columnMapping, options, i);
+        final placemark = _createPointPlacemark(row, columnMapping, options, i);
         if (placemark != null) {
           buffer.writeln(placemark);
           processedCount++;
@@ -183,66 +255,195 @@ class KmlGenerationService implements IKmlGenerationService {
         if (kDebugMode) {
           print('Warning: Skipping row ${i + 1}: ${e.toString()}');
         }
-        // Continue processing other rows
       }
     }
 
-    // KML footer
-    buffer.writeln('</Document>');
-    buffer.writeln('</kml>');
-
-    if (kDebugMode) {
-      print('KML generation completed:');
-      print('  Processed: $processedCount placemarks');
-      print('  Skipped: $skippedCount rows');
-      print(
-        '  Success rate: ${(processedCount / csvData.rows.length * 100).toStringAsFixed(1)}%',
-      );
-    }
-
-    return buffer.toString();
+    onStats(processedCount, skippedCount);
   }
 
-  /// Add default styles to KML document
-  void _addDefaultStyles(StringBuffer buffer, KmlGenerationOptions options) {
-    // Default point style
-    buffer.writeln('<Style id="defaultStyle">');
-    buffer.writeln('  <IconStyle>');
-    buffer.writeln('    <color>ff0000ff</color>'); // Red color
-    buffer.writeln('    <scale>1.0</scale>');
-    buffer.writeln('    <Icon>');
+  /// Generate single LineString placemark from all valid CSV coordinates
+  void _generateLineStringPlacemark(
+    StringBuffer buffer,
+    CsvData csvData,
+    ColumnMapping columnMapping,
+    KmlGenerationOptions options,
+    Function(int processed, int skipped) onStats,
+  ) {
+    final coordinates = <String>[];
+    int processedCount = 0;
+    int skippedCount = 0;
+
+    // Collect all valid coordinates
+    for (int i = 0; i < csvData.rows.length; i++) {
+      final row = csvData.rows[i];
+
+      try {
+        final latValue = row[columnMapping.latitudeColumn];
+        final lonValue = row[columnMapping.longitudeColumn];
+
+        if (latValue == null || lonValue == null) {
+          skippedCount++;
+          continue;
+        }
+
+        final latitude = _parseCoordinate(latValue);
+        final longitude = _parseCoordinate(lonValue);
+
+        if (latitude == null || longitude == null) {
+          skippedCount++;
+          continue;
+        }
+
+        if (latitude < -90 ||
+            latitude > 90 ||
+            longitude < -180 ||
+            longitude > 180) {
+          skippedCount++;
+          continue;
+        }
+
+        final elevation = _extractElevation(row, columnMapping, options);
+        final coord =
+            elevation != null && elevation != 0.0
+                ? '$longitude,$latitude,$elevation'
+                : '$longitude,$latitude';
+
+        coordinates.add(coord);
+        processedCount++;
+      } catch (e) {
+        skippedCount++;
+      }
+    }
+
+    if (coordinates.length < 2) {
+      if (kDebugMode) {
+        print(
+          'Warning: LineString requires at least 2 coordinates. Found: ${coordinates.length}',
+        );
+      }
+      onStats(0, csvData.rows.length);
+      return;
+    }
+
+    // Create LineString placemark
+    buffer.writeln('  <Placemark>');
+    buffer.writeln('    <name>${_escapeXml(options.documentName)} Path</name>');
     buffer.writeln(
-      '      <href>http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png</href>',
+      '    <description>Generated path from ${coordinates.length} points</description>',
     );
-    buffer.writeln('    </Icon>');
-    buffer.writeln('  </IconStyle>');
-    buffer.writeln('  <LabelStyle>');
-    buffer.writeln('    <color>ff000000</color>'); // Black labels
-    buffer.writeln('    <scale>0.9</scale>');
-    buffer.writeln('  </LabelStyle>');
-    buffer.writeln('</Style>');
 
-    // Add custom styles from options
-    if (options.useCustomIcons && options.styleRules.isNotEmpty) {
-      for (final entry in options.styleRules.entries) {
-        final styleId = entry.key;
-        final rule = entry.value;
+    // Style reference
+    buffer.writeln('    <styleUrl>#lineStringStyle</styleUrl>');
 
-        buffer.writeln('<Style id="$styleId">');
-        buffer.writeln('  <IconStyle>');
-        buffer.writeln('    <color>${rule.color}</color>');
-        buffer.writeln('    <scale>1.0</scale>');
-        buffer.writeln('    <Icon>');
-        buffer.writeln('      <href>${rule.iconUrl}</href>');
-        buffer.writeln('    </Icon>');
-        buffer.writeln('  </IconStyle>');
-        buffer.writeln('</Style>');
-      }
-    }
+    // LineString geometry
+    buffer.writeln('    <LineString>');
+    buffer.writeln('      <tessellate>1</tessellate>');
+    buffer.writeln('      <coordinates>');
+    buffer.writeln('        ${coordinates.join(' ')}');
+    buffer.writeln('      </coordinates>');
+    buffer.writeln('    </LineString>');
+    buffer.writeln('  </Placemark>');
+
+    onStats(1, skippedCount); // 1 placemark created
   }
 
-  /// Create a placemark from a CSV row
-  String? _createPlacemark(
+  /// Generate single Polygon placemark from all valid CSV coordinates
+  void _generatePolygonPlacemark(
+    StringBuffer buffer,
+    CsvData csvData,
+    ColumnMapping columnMapping,
+    KmlGenerationOptions options,
+    Function(int processed, int skipped) onStats,
+  ) {
+    final coordinates = <String>[];
+    int processedCount = 0;
+    int skippedCount = 0;
+
+    // Collect all valid coordinates
+    for (int i = 0; i < csvData.rows.length; i++) {
+      final row = csvData.rows[i];
+
+      try {
+        final latValue = row[columnMapping.latitudeColumn];
+        final lonValue = row[columnMapping.longitudeColumn];
+
+        if (latValue == null || lonValue == null) {
+          skippedCount++;
+          continue;
+        }
+
+        final latitude = _parseCoordinate(latValue);
+        final longitude = _parseCoordinate(lonValue);
+
+        if (latitude == null || longitude == null) {
+          skippedCount++;
+          continue;
+        }
+
+        if (latitude < -90 ||
+            latitude > 90 ||
+            longitude < -180 ||
+            longitude > 180) {
+          skippedCount++;
+          continue;
+        }
+
+        final elevation = _extractElevation(row, columnMapping, options);
+        final coord =
+            elevation != null && elevation != 0.0
+                ? '$longitude,$latitude,$elevation'
+                : '$longitude,$latitude';
+
+        coordinates.add(coord);
+        processedCount++;
+      } catch (e) {
+        skippedCount++;
+      }
+    }
+
+    if (coordinates.length < 3) {
+      if (kDebugMode) {
+        print(
+          'Warning: Polygon requires at least 3 coordinates. Found: ${coordinates.length}',
+        );
+      }
+      onStats(0, csvData.rows.length);
+      return;
+    }
+
+    // Ensure polygon is closed (first point = last point)
+    if (coordinates.first != coordinates.last) {
+      coordinates.add(coordinates.first);
+    }
+
+    // Create Polygon placemark
+    buffer.writeln('  <Placemark>');
+    buffer.writeln('    <name>${_escapeXml(options.documentName)} Area</name>');
+    buffer.writeln(
+      '    <description>Generated polygon from ${coordinates.length - 1} points</description>',
+    );
+
+    // Style reference
+    buffer.writeln('    <styleUrl>#polygonStyle</styleUrl>');
+
+    // Polygon geometry
+    buffer.writeln('    <Polygon>');
+    buffer.writeln('      <tessellate>1</tessellate>');
+    buffer.writeln('      <outerBoundaryIs>');
+    buffer.writeln('        <LinearRing>');
+    buffer.writeln('          <coordinates>');
+    buffer.writeln('            ${coordinates.join(' ')}');
+    buffer.writeln('          </coordinates>');
+    buffer.writeln('        </LinearRing>');
+    buffer.writeln('      </outerBoundaryIs>');
+    buffer.writeln('    </Polygon>');
+    buffer.writeln('  </Placemark>');
+
+    onStats(1, skippedCount); // 1 placemark created
+  }
+
+  /// Create a point placemark from a CSV row
+  String? _createPointPlacemark(
     Map<String, dynamic> row,
     ColumnMapping columnMapping,
     KmlGenerationOptions options,
@@ -304,72 +505,87 @@ class KmlGenerationService implements IKmlGenerationService {
       buffer.writeln('    <styleUrl>#$styleId</styleUrl>');
     }
 
-    // Geometry
-    final geometry = _createGeometry(
-      latitude: latitude,
-      longitude: longitude,
-      elevation: _extractElevation(row, columnMapping, options),
-      geometryType: options.geometryType,
-    );
-    buffer.write(geometry); // Note: geometry includes its own indentation
-
-    buffer.writeln('  </Placemark>');
-    return buffer.toString();
-  }
-
-  /// Create geometry element based on geometry type
-  String _createGeometry({
-    required double latitude,
-    required double longitude,
-    double? elevation,
-    required GeometryType geometryType,
-  }) {
+    // Point geometry
+    final elevation = _extractElevation(row, columnMapping, options);
     final coords =
         elevation != null && elevation != 0.0
             ? '$longitude,$latitude,$elevation'
             : '$longitude,$latitude';
 
-    switch (geometryType) {
-      case GeometryType.point:
-        return '''    <Point>
-      <coordinates>$coords</coordinates>
-    </Point>
-''';
+    buffer.writeln('    <Point>');
+    buffer.writeln('      <coordinates>$coords</coordinates>');
+    buffer.writeln('    </Point>');
 
-      case GeometryType.lineString:
-        // For single point data, we'll create a point instead
-        return '''    <Point>
-      <coordinates>$coords</coordinates>
-    </Point>
-''';
+    buffer.writeln('  </Placemark>');
+    return buffer.toString();
+  }
 
-      case GeometryType.polygon:
-        // For single point data, we'll create a point instead
-        return '''    <Point>
-      <coordinates>$coords</coordinates>
-    </Point>
-''';
+  /// Add styles to KML document based on geometry type and options
+  void _addStyles(StringBuffer buffer, KmlGenerationOptions options) {
+    // Default point style
+    buffer.writeln('<Style id="defaultStyle">');
+    buffer.writeln('  <IconStyle>');
+    buffer.writeln('    <color>ff0000ff</color>'); // Red color
+    buffer.writeln('    <scale>1.0</scale>');
+    buffer.writeln('    <Icon>');
+    buffer.writeln(
+      '      <href>http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png</href>',
+    );
+    buffer.writeln('    </Icon>');
+    buffer.writeln('  </IconStyle>');
+    buffer.writeln('  <LabelStyle>');
+    buffer.writeln('    <color>ff000000</color>'); // Black labels
+    buffer.writeln('    <scale>0.9</scale>');
+    buffer.writeln('  </LabelStyle>');
+    buffer.writeln('</Style>');
 
-      case GeometryType.linearRing:
-        // For single point data, we'll create a point instead
-        return '''    <Point>
-      <coordinates>$coords</coordinates>
-    </Point>
-''';
+    // LineString style
+    buffer.writeln('<Style id="lineStringStyle">');
+    buffer.writeln('  <LineStyle>');
+    buffer.writeln(
+      '    <color>ff0000ff</color>',
+    ); // Red color (AABBGGRR format)
+    buffer.writeln('    <width>3</width>');
+    buffer.writeln('  </LineStyle>');
+    buffer.writeln('  <LabelStyle>');
+    buffer.writeln('    <color>ff000000</color>');
+    buffer.writeln('    <scale>0.9</scale>');
+    buffer.writeln('  </LabelStyle>');
+    buffer.writeln('</Style>');
 
-      case GeometryType.multiGeometry:
-        // For single point data, we'll create a point instead
-        return '''    <Point>
-      <coordinates>$coords</coordinates>
-    </Point>
-''';
+    // Polygon style
+    buffer.writeln('<Style id="polygonStyle">');
+    buffer.writeln('  <LineStyle>');
+    buffer.writeln('    <color>ff0000ff</color>'); // Red border
+    buffer.writeln('    <width>2</width>');
+    buffer.writeln('  </LineStyle>');
+    buffer.writeln('  <PolyStyle>');
+    buffer.writeln('    <color>7f0000ff</color>'); // Semi-transparent red fill
+    buffer.writeln('    <fill>1</fill>');
+    buffer.writeln('    <outline>1</outline>');
+    buffer.writeln('  </PolyStyle>');
+    buffer.writeln('  <LabelStyle>');
+    buffer.writeln('    <color>ff000000</color>');
+    buffer.writeln('    <scale>0.9</scale>');
+    buffer.writeln('  </LabelStyle>');
+    buffer.writeln('</Style>');
 
-      case GeometryType.model:
-        // For single point data, we'll create a point instead
-        return '''    <Point>
-      <coordinates>$coords</coordinates>
-    </Point>
-''';
+    // Add custom styles from options
+    if (options.useCustomIcons && options.styleRules.isNotEmpty) {
+      for (final entry in options.styleRules.entries) {
+        final styleId = entry.key;
+        final rule = entry.value;
+
+        buffer.writeln('<Style id="$styleId">');
+        buffer.writeln('  <IconStyle>');
+        buffer.writeln('    <color>${rule.color}</color>');
+        buffer.writeln('    <scale>1.0</scale>');
+        buffer.writeln('    <Icon>');
+        buffer.writeln('      <href>${rule.iconUrl}</href>');
+        buffer.writeln('    </Icon>');
+        buffer.writeln('  </IconStyle>');
+        buffer.writeln('</Style>');
+      }
     }
   }
 

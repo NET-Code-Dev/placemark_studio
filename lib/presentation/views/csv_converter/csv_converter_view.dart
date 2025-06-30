@@ -6,6 +6,8 @@ import '../../../core/enums/export_format.dart';
 import '../../../core/enums/geometry_type.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/column_mapping.dart';
+import 'widgets/geometry_type_selector.dart';
+import 'widgets/styling_options_panel.dart';
 
 class CsvConverterView extends StatelessWidget {
   const CsvConverterView({super.key});
@@ -116,7 +118,7 @@ class _CsvConverterContent extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              viewModel.error ?? 'An unknown error occurred',
+              viewModel.errorMessage ?? 'An unknown error occurred',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyLarge,
             ),
@@ -334,35 +336,40 @@ class _CsvConverterContent extends StatelessWidget {
         // Data table preview
         Expanded(
           child: SingleChildScrollView(
-            scrollDirection: Axis.both,
-            child: DataTable(
-              columns:
-                  csvData.headers
-                      .map(
-                        (header) => DataColumn(
-                          label: Text(
-                            header,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+            scrollDirection: Axis.horizontal,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.vertical,
+              child: DataTable(
+                columns:
+                    csvData.headers
+                        .map(
+                          (header) => DataColumn(
+                            label: Text(
+                              header,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
-                        ),
-                      )
-                      .toList(),
-              rows:
-                  csvData.rows
-                      .take(10)
-                      .map(
-                        (row) => DataRow(
-                          cells:
-                              csvData.headers
-                                  .map(
-                                    (header) => DataCell(
-                                      Text(row[header]?.toString() ?? ''),
-                                    ),
-                                  )
-                                  .toList(),
-                        ),
-                      )
-                      .toList(),
+                        )
+                        .toList(),
+                rows:
+                    csvData.rows
+                        .take(10)
+                        .map(
+                          (row) => DataRow(
+                            cells:
+                                csvData.headers
+                                    .map(
+                                      (header) => DataCell(
+                                        Text(row[header]?.toString() ?? ''),
+                                      ),
+                                    )
+                                    .toList(),
+                          ),
+                        )
+                        .toList(),
+              ),
             ),
           ),
         ),
@@ -431,15 +438,17 @@ class _CsvConverterContent extends StatelessWidget {
           ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
-        ...ExportFormat.values.map(
-          (format) => RadioListTile<ExportFormat>(
-            title: Text(format.displayName),
-            subtitle: Text(format.description),
-            value: format,
-            groupValue: viewModel.selectedExportFormat,
-            onChanged: (value) => viewModel.setExportFormat(value!),
-          ),
-        ),
+        ...ExportFormat.values
+            .where((format) => format.isSupportedForCsvConversion)
+            .map(
+              (format) => RadioListTile<ExportFormat>(
+                title: Text(format.displayName),
+                subtitle: Text(format.description),
+                value: format,
+                groupValue: viewModel.selectedExportFormat,
+                onChanged: (value) => viewModel.setExportFormat(value!),
+              ),
+            ),
 
         const SizedBox(height: 32),
 
@@ -681,6 +690,32 @@ class _CsvConverterContent extends StatelessWidget {
         break;
       case ExportFormat.kmz:
         viewModel.exportToKmz();
+        break;
+      case ExportFormat.csv:
+      case ExportFormat.dgn:
+      case ExportFormat.dxf:
+      case ExportFormat.esriFileGdb:
+      case ExportFormat.shapefile:
+      case ExportFormat.flatGeobuf:
+      case ExportFormat.gml:
+      case ExportFormat.geoPackage:
+      case ExportFormat.gpx:
+      case ExportFormat.geoJson:
+      case ExportFormat.geoJsonSeq:
+      case ExportFormat.mbTiles:
+      case ExportFormat.mvt:
+      case ExportFormat.mapInfoTab:
+      case ExportFormat.ods:
+      case ExportFormat.pdf:
+      case ExportFormat.parquet:
+      case ExportFormat.sqlite:
+      case ExportFormat.svg:
+      case ExportFormat.topoJson:
+      case ExportFormat.wkt:
+      case ExportFormat.xlsx:
+        // These formats are not supported for CSV conversion
+        // Default to KML export
+        viewModel.exportToKml();
         break;
     }
   }
