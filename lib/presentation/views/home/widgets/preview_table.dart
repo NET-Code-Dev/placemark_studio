@@ -106,7 +106,8 @@ class _PreviewTableState extends State<PreviewTable> {
                                     color:
                                         Theme.of(
                                           context,
-                                        ).colorScheme.surfaceVariant,
+                                          //  ).colorScheme.surfaceVariant,
+                                        ).colorScheme.surfaceContainerHighest,
                                     borderRadius: const BorderRadius.only(
                                       topLeft: Radius.circular(8),
                                       topRight: Radius.circular(8),
@@ -143,8 +144,9 @@ class _PreviewTableState extends State<PreviewTable> {
                                                   ).colorScheme.surface
                                                   : Theme.of(context)
                                                       .colorScheme
-                                                      .surfaceVariant
-                                                      .withOpacity(0.3),
+                                                      //  .surfaceVariant
+                                                      .surfaceContainerHighest
+                                                      .withValues(alpha: 0.3),
                                           border: Border(
                                             bottom: BorderSide(
                                               color:
@@ -295,8 +297,8 @@ class _TableCell extends StatelessWidget {
                     : theme.textTheme.bodySmall?.copyWith(
                       color:
                           content.isEmpty
-                              ? theme.colorScheme.onSurfaceVariant.withOpacity(
-                                0.6,
+                              ? theme.colorScheme.onSurfaceVariant.withValues(
+                                alpha: 0.6,
                               )
                               : theme.colorScheme.onSurface,
                     ),

@@ -43,7 +43,8 @@ class ExportOptionsPanel extends StatelessWidget {
                   const SizedBox(height: 16),
                   _SimplifiedDuplicateHeadersPanel(),
                 ],
-                const SizedBox(height: 20),
+                //const SizedBox(height: 20),
+                Spacer(),
                 SizedBox(
                   width: double.infinity,
                   child: CustomElevatedButton(
@@ -185,7 +186,7 @@ class _LayerSeparationOption extends StatelessWidget {
                               !viewModel.separateLayers
                                   ? Theme.of(
                                     context,
-                                  ).colorScheme.primary.withOpacity(0.1)
+                                  ).colorScheme.primary.withValues(alpha: 0.1)
                                   : null,
                           borderRadius: BorderRadius.circular(6),
                         ),
@@ -240,7 +241,7 @@ class _LayerSeparationOption extends StatelessWidget {
                               viewModel.separateLayers
                                   ? Theme.of(
                                     context,
-                                  ).colorScheme.primary.withOpacity(0.1)
+                                  ).colorScheme.primary.withValues(alpha: 0.1)
                                   : null,
                           borderRadius: BorderRadius.circular(6),
                         ),
@@ -270,7 +271,7 @@ class _LayerSeparationOption extends StatelessWidget {
                                   ),
                                   Text(
                                     hasHierarchy
-                                        ? 'Create ${layersWithData} files'
+                                        ? 'Create $layersWithData files'
                                         : 'Each layer in own file',
                                     style: Theme.of(context).textTheme.bodySmall
                                         ?.copyWith(color: Colors.grey[600]),
@@ -333,7 +334,7 @@ class _FileNamingOption extends StatelessWidget {
                                 !viewModel.useSimpleFileNaming
                                     ? Theme.of(
                                       context,
-                                    ).colorScheme.primary.withOpacity(0.1)
+                                    ).colorScheme.primary.withValues(alpha: 0.1)
                                     : null,
                             borderRadius: BorderRadius.circular(6),
                           ),
@@ -391,7 +392,7 @@ class _FileNamingOption extends StatelessWidget {
                                 viewModel.useSimpleFileNaming
                                     ? Theme.of(
                                       context,
-                                    ).colorScheme.primary.withOpacity(0.1)
+                                    ).colorScheme.primary.withValues(alpha: 0.1)
                                     : null,
                             borderRadius: BorderRadius.circular(6),
                           ),

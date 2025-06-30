@@ -258,7 +258,7 @@ class CsvParserService implements ICsvParserService {
 
           if (kDebugMode) {
             print(
-              'Delimiter "$delimiter": ${firstRowCount} columns, consistency: $consistencyScore%, score: $totalScore',
+              'Delimiter "$delimiter": $firstRowCount columns, consistency: $consistencyScore%, score: $totalScore',
             );
           }
         }

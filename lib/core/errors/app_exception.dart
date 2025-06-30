@@ -10,16 +10,13 @@ abstract class AppException implements Exception {
 }
 
 class FileProcessingException extends AppException {
-  const FileProcessingException(String message, {String? code, dynamic details})
-    : super(message, code: code, details: details);
+  const FileProcessingException(super.message, {super.code, super.details});
 }
 
 class ValidationException extends AppException {
-  const ValidationException(String message, {String? code, dynamic details})
-    : super(message, code: code, details: details);
+  const ValidationException(super.message, {super.code, super.details});
 }
 
 class ConversionException extends AppException {
-  const ConversionException(String message, {String? code, dynamic details})
-    : super(message, code: code, details: details);
+  const ConversionException(super.message, {super.code, super.details});
 }

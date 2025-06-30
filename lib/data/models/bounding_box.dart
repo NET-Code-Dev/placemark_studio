@@ -41,7 +41,9 @@ class BoundingBox extends Equatable {
         }).toList();
 
     if (validCoordinates.isEmpty) {
-      print('WARNING: No valid coordinates found after filtering');
+      if (kDebugMode) {
+        print('WARNING: No valid coordinates found after filtering');
+      }
       const zero = Coordinate(longitude: 0, latitude: 0);
       return const BoundingBox(
         northWest: zero,

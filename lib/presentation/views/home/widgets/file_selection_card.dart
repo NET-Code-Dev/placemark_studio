@@ -282,12 +282,11 @@ class _FileSelectionCardState extends State<FileSelectionCard>
                                 decoration: BoxDecoration(
                                   color: Theme.of(
                                     context,
-                                  ).colorScheme.primary.withOpacity(0.1),
+                                  ).colorScheme.primary.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary.withOpacity(0.3),
+                                    color: Theme.of(context).colorScheme.primary
+                                        .withValues(alpha: 0.3),
                                   ),
                                 ),
                                 child: Text(

@@ -242,7 +242,7 @@ class _ConverterCardState extends State<_ConverterCard>
                           width: 64,
                           height: 64,
                           decoration: BoxDecoration(
-                            color: widget.iconColor.withOpacity(0.1),
+                            color: widget.iconColor.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
@@ -327,7 +327,7 @@ class _ConverterCardState extends State<_ConverterCard>
       return Colors.grey[50];
     }
     if (_isHovered) {
-      return widget.iconColor.withOpacity(0.05);
+      return widget.iconColor.withValues(alpha: 0.05);
     }
     return null;
   }
@@ -336,7 +336,10 @@ class _ConverterCardState extends State<_ConverterCard>
     if (_isHovered && widget.isAvailable) {
       return BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: widget.iconColor.withOpacity(0.3), width: 2),
+        border: Border.all(
+          color: widget.iconColor.withValues(alpha: 0.3),
+          width: 2,
+        ),
       );
     }
     return null;

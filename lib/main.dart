@@ -13,8 +13,8 @@ void main() async {
 
     WindowOptions windowOptions = const WindowOptions(
       title: 'Placemark Studio',
-      size: Size(800, 600),
-      minimumSize: Size(800, 600),
+      size: Size(900, 950),
+      minimumSize: Size(900, 950),
       center: true,
       backgroundColor: Colors.transparent,
       skipTaskbar: false,

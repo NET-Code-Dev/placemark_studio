@@ -301,7 +301,7 @@ class _InteractiveBoundingBoxMapState
             if (_isLoading)
               Positioned.fill(
                 child: Container(
-                  color: Colors.black.withOpacity(0.3),
+                  color: Colors.black.withValues(alpha: 0.3),
                   child: const Center(
                     child: CircularProgressIndicator(
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
@@ -506,7 +506,10 @@ class _MapTile extends StatelessWidget {
       width: 256,
       height: 256,
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.withOpacity(0.3), width: 0.5),
+        border: Border.all(
+          color: Colors.grey.withValues(alpha: 0.3),
+          width: 0.5,
+        ),
       ),
       child: Stack(
         children: [
@@ -618,7 +621,7 @@ class _BoundingBoxOverlayPainter extends CustomPainter {
       // Draw fill
       final fillPaint =
           Paint()
-            ..color = color.withOpacity(0.2)
+            ..color = color.withValues(alpha: 0.2)
             ..style = PaintingStyle.fill;
       canvas.drawRect(rect, fillPaint);
 
@@ -637,14 +640,18 @@ class _BoundingBoxOverlayPainter extends CustomPainter {
             ..style = PaintingStyle.fill;
 
       const dotRadius = 4.0;
-      if (_isPointVisible(nwPixel, size))
+      if (_isPointVisible(nwPixel, size)) {
         canvas.drawCircle(nwPixel, dotRadius, dotPaint);
-      if (_isPointVisible(nePixel, size))
+      }
+      if (_isPointVisible(nePixel, size)) {
         canvas.drawCircle(nePixel, dotRadius, dotPaint);
-      if (_isPointVisible(swPixel, size))
+      }
+      if (_isPointVisible(swPixel, size)) {
         canvas.drawCircle(swPixel, dotRadius, dotPaint);
-      if (_isPointVisible(sePixel, size))
+      }
+      if (_isPointVisible(sePixel, size)) {
         canvas.drawCircle(sePixel, dotRadius, dotPaint);
+      }
     }
   }
 
@@ -722,11 +729,11 @@ class _MapTypeSelectorState extends State<_MapTypeSelector> {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95),
+        color: Colors.white.withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(8),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -843,11 +850,11 @@ class _ZoomControls extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95),
+        color: Colors.white.withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(8),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -922,7 +929,7 @@ class _ZoomButton extends StatelessWidget {
       message: tooltip,
       child: InkWell(
         onTap: onPressed,
-        child: Container(
+        child: SizedBox(
           width: 36,
           height: 36,
           child: Icon(
@@ -952,7 +959,7 @@ class _MapInfoOverlay extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.7),
+        color: Colors.black.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Column(
@@ -1351,7 +1358,7 @@ class _InteractiveBoundingBoxMapState
             if (_isLoading)
               Positioned.fill(
                 child: Container(
-                  color: Colors.black.withOpacity(0.3),
+                  color: Colors.black.withValues(alpha: 0.3),
                   child: const Center(
                     child: CircularProgressIndicator(
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
@@ -1498,7 +1505,7 @@ class _MapTile extends StatelessWidget {
       width: 256,
       height: 256,
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.withOpacity(0.3), width: 0.5),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.3), width: 0.5),
       ),
       child: Image.network(
         url,
@@ -1595,7 +1602,7 @@ class _BoundingBoxOverlayPainter extends CustomPainter {
       // Draw fill
       final fillPaint =
           Paint()
-            ..color = color.withOpacity(0.2)
+            ..color = color.withValues(alpha: 0.2)
             ..style = PaintingStyle.fill;
       canvas.drawRect(rect, fillPaint);
 
@@ -1689,11 +1696,11 @@ class _ZoomControls extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95),
+        color: Colors.white.withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(8),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -1798,7 +1805,7 @@ class _MapInfoOverlay extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.7),
+        color: Colors.black.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Column(

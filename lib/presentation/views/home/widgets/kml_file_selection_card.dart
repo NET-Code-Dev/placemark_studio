@@ -270,10 +270,10 @@ class _KmlFileSelectionCardState extends State<KmlFileSelectionCard>
                                   vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.blue.withOpacity(0.1),
+                                  color: Colors.blue.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
-                                    color: Colors.blue.withOpacity(0.3),
+                                    color: Colors.blue.withValues(alpha: 0.3),
                                   ),
                                 ),
                                 child: Text(

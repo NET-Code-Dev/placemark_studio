@@ -353,7 +353,7 @@ class _ErrorDetailsSectionState extends State<_ErrorDetailsSection> {
               ],
             ),
           );
-        }).toList(),
+        }),
 
         if (widget.errors.length > 3) ...[
           const SizedBox(height: 8),
@@ -498,7 +498,10 @@ class _TableHeaderCell extends StatelessWidget {
                     width: 0.5,
                   ),
         ),
-        color: isMapped ? _getMappingColor(mappingType).withOpacity(0.1) : null,
+        color:
+            isMapped
+                ? _getMappingColor(mappingType).withValues(alpha: 0.1)
+                : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -591,9 +594,9 @@ class _TableDataCell extends StatelessWidget {
         ),
         color:
             hasValidationIssue
-                ? Colors.red.withOpacity(0.1)
+                ? Colors.red.withValues(alpha: 0.1)
                 : isMapped
-                ? _getMappingColor(mappingType).withOpacity(0.05)
+                ? _getMappingColor(mappingType).withValues(alpha: 0.05)
                 : null,
       ),
       child: Row(

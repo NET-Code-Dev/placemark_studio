@@ -165,9 +165,9 @@ class _MappingStatusIndicator extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: status.color.withOpacity(0.1),
+        color: status.color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: status.color.withOpacity(0.3)),
+        border: Border.all(color: status.color.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -187,7 +187,7 @@ class _MappingStatusIndicator extends StatelessWidget {
                 Text(
                   mapping.statusMessage,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: status.color.withOpacity(0.8),
+                    color: status.color.withValues(alpha: 0.8),
                   ),
                 ),
               ],

@@ -134,14 +134,14 @@ class _ConversionWorkflowView extends StatelessWidget {
                 subtitle: 'Review your data and validate coordinates',
                 isActive: viewModel.currentStep >= ConversionStep.dataPreview,
                 isCompleted: viewModel.currentStep > ConversionStep.dataPreview,
-                child:
-                    viewModel.currentStep >= ConversionStep.dataPreview
-                        ? const CsvPreviewTable()
-                        : null,
                 canActivate: viewModel.columnMapping?.hasCoordinates ?? false,
                 inactiveReason:
                     viewModel.columnMapping?.hasCoordinates == false
                         ? 'Complete column mapping first'
+                        : null,
+                child:
+                    viewModel.currentStep >= ConversionStep.dataPreview
+                        ? const CsvPreviewTable()
                         : null,
               ),
 
@@ -156,6 +156,11 @@ class _ConversionWorkflowView extends StatelessWidget {
                     viewModel.currentStep >= ConversionStep.geometryAndStyling,
                 isCompleted:
                     viewModel.currentStep > ConversionStep.geometryAndStyling,
+                canActivate: viewModel.canProceedToStyling,
+                inactiveReason:
+                    !viewModel.canProceedToStyling
+                        ? 'Validate coordinate data first'
+                        : null,
                 child:
                     viewModel.currentStep >= ConversionStep.geometryAndStyling
                         ? const Row(
@@ -165,11 +170,6 @@ class _ConversionWorkflowView extends StatelessWidget {
                             Expanded(child: StylingOptionsPanel()),
                           ],
                         )
-                        : null,
-                canActivate: viewModel.canProceedToStyling,
-                inactiveReason:
-                    !viewModel.canProceedToStyling
-                        ? 'Validate coordinate data first'
                         : null,
               ),
 
@@ -181,15 +181,15 @@ class _ConversionWorkflowView extends StatelessWidget {
                 title: 'Export Options',
                 subtitle: 'Configure output format and generate files',
                 isActive: viewModel.currentStep >= ConversionStep.exportOptions,
-                isCompleted: false, // Never completed
-                child:
-                    viewModel.currentStep >= ConversionStep.exportOptions
-                        ? const KmlExportPanel()
-                        : null,
+                isCompleted: false,
                 canActivate: viewModel.canExport,
                 inactiveReason:
                     !viewModel.canExport
                         ? 'Complete previous steps first'
+                        : null, // Never completed
+                child:
+                    viewModel.currentStep >= ConversionStep.exportOptions
+                        ? const KmlExportPanel()
                         : null,
               ),
             ],
