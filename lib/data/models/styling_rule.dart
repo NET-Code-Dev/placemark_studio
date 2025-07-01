@@ -260,7 +260,7 @@ class EnhancedStylingOptions {
           columnName: stylingColumn!,
           columnValue: rule.value,
           color: rule.style.color.kmlValue,
-          iconUrl: rule.style.icon?.url ?? KmlIcon.yellowPushpin.url,
+          iconUrl: rule.style.icon?.url ?? KmlIcon.pushpin.url,
         );
       }
     }

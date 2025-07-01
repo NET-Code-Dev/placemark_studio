@@ -1,23 +1,26 @@
 import 'package:flutter/material.dart';
 import '../../../../core/enums/geometry_type.dart';
+import '../../../../data/models/styling_rule.dart';
 import '../../../../data/models/styling_options.dart';
+import 'enhanced_rule_dialog.dart';
+import 'style_editor_widget.dart';
 
 class StylingOptionsPanel extends StatefulWidget {
   final GeometryType geometryType;
-  final StylingOptions stylingOptions;
   final List<String> availableColumns;
-  final Function(StylingOptions) onStylingChanged;
-  final Function(String)? onPreviewColumn;
   final List<String>? previewColumnValues;
+  final EnhancedStylingOptions stylingOptions;
+  final Function(EnhancedStylingOptions) onStylingChanged;
+  final Function(String)? onPreviewColumn;
 
   const StylingOptionsPanel({
     super.key,
     required this.geometryType,
-    required this.stylingOptions,
     required this.availableColumns,
+    this.previewColumnValues,
+    required this.stylingOptions,
     required this.onStylingChanged,
     this.onPreviewColumn,
-    this.previewColumnValues,
   });
 
   @override
@@ -25,7 +28,7 @@ class StylingOptionsPanel extends StatefulWidget {
 }
 
 class _StylingOptionsPanelState extends State<StylingOptionsPanel> {
-  late StylingOptions _currentOptions;
+  late EnhancedStylingOptions _currentOptions;
 
   @override
   void initState() {
@@ -43,614 +46,254 @@ class _StylingOptionsPanelState extends State<StylingOptionsPanel> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildStylingHeader(context),
+            const SizedBox(height: 16),
+            _buildDefaultStyleSection(context),
+            const SizedBox(height: 20),
+            _buildRuleBasedStylingSection(context),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStylingHeader(BuildContext context) {
+    return Row(
       children: [
-        // Geometry visual options
-        // _buildGeometryOptionsSection(context),
-
-        // const SizedBox(height: 24),
-
-        // Default styling configuration
-        _buildDefaultStylingSection(context),
-
-        const SizedBox(height: 24),
-
-        // Column-based styling
-        _buildColumnBasedStylingSection(context),
-
-        const SizedBox(height: 24),
-
-        // Style preview
-        _buildStylePreviewSection(context),
-      ],
-    );
-  }
-
-  /*
-  Widget _buildGeometryOptionsSection(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                _getGeometryIcon(widget.geometryType),
-                const SizedBox(width: 12),
-                Text(
-                  'Visual Geometry Options',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue[200]!),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.geometryType.displayName,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.blue[700],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _getGeometryDescription(widget.geometryType),
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        size: 16,
-                        color: Colors.blue[600],
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _getGeometryHelpText(widget.geometryType),
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: Colors.blue[600]),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-*/
-  Widget _buildDefaultStylingSection(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Default Styling Configuration',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Configure the default appearance for all ${widget.geometryType.displayName.toLowerCase()}s',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 16),
-
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey[300]!),
-              ),
-              child: Column(
-                children: [
-                  // Color selection
-                  _buildColorSelection(context, _currentOptions.defaultStyle),
-
-                  const SizedBox(height: 16),
-
-                  // Icon selection (for points only)
-                  if (widget.geometryType == GeometryType.point) ...[
-                    _buildIconSelection(context, _currentOptions.defaultStyle),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // Line width (for lines and polygons)
-                  if (widget.geometryType == GeometryType.lineString ||
-                      widget.geometryType == GeometryType.polygon) ...[
-                    _buildLineWidthSelection(
-                      context,
-                      _currentOptions.defaultStyle,
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // Opacity (for polygons)
-                  if (widget.geometryType == GeometryType.polygon) ...[
-                    _buildOpacitySelection(
-                      context,
-                      _currentOptions.defaultStyle,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildColumnBasedStylingSection(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Column-Based Styling',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Switch(
-                  value: _currentOptions.useColumnBasedStyling,
-                  onChanged: _updateColumnBasedStyling,
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Style features based on values in a specific column',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
-            ),
-
-            if (_currentOptions.useColumnBasedStyling) ...[
-              const SizedBox(height: 16),
-
-              // Column selection dropdown
-              Row(
-                children: [
-                  Text(
-                    'Styling Column:',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: _currentOptions.stylingColumn,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                      ),
-                      hint: const Text('Select column for styling'),
-                      items:
-                          widget.availableColumns.map((column) {
-                            return DropdownMenuItem(
-                              value: column,
-                              child: Text(column),
-                            );
-                          }).toList(),
-                      onChanged: _updateStylingColumn,
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-
-              // Column values preview
-              if (_currentOptions.stylingColumn != null &&
-                  widget.previewColumnValues != null) ...[
-                _buildColumnValuesPreview(context),
-                const SizedBox(height: 16),
-              ],
-
-              // Style rules
-              if (_currentOptions.stylingColumn != null) ...[
-                _buildStyleRulesSection(context),
-              ],
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStylePreviewSection(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Style Preview',
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Preview how your styling will appear in the final KML',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 16),
-
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey[300]!),
-              ),
-              child: Column(
-                children: [
-                  // Default style preview
-                  _buildStylePreviewRow(
-                    context,
-                    'Default Style',
-                    _currentOptions.defaultStyle,
-                    isDefault: true,
-                  ),
-
-                  // Column-based styles preview
-                  if (_currentOptions.useColumnBasedStyling &&
-                      _currentOptions.columnBasedStyles.isNotEmpty) ...[
-                    const Divider(height: 20),
-                    Text(
-                      'Custom Styles',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    ..._currentOptions.columnBasedStyles.entries.map(
-                      (entry) => _buildStylePreviewRow(
-                        context,
-                        '${_currentOptions.stylingColumn}: ${entry.key}',
-                        entry.value,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Validation info
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.green[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green[200]!),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.check_circle, color: Colors.green[600], size: 20),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Styling configuration is valid and ready for export',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.green[700],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Helper widgets
-
-  Widget _buildColorSelection(BuildContext context, GeometryStyle style) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+        Icon(Icons.palette, color: Theme.of(context).primaryColor),
+        const SizedBox(width: 8),
         Text(
-          'Color',
+          'Styling & Visual Appearance',
           style: Theme.of(
             context,
-          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children:
-              KmlColor.predefinedColors.map((color) {
-                final isSelected = color.kmlValue == style.color.kmlValue;
-                return GestureDetector(
-                  onTap:
-                      () => _updateDefaultStyle(style.copyWith(color: color)),
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: color.color,
-                      border: Border.all(
-                        color: isSelected ? Colors.black : Colors.grey[300]!,
-                        width: isSelected ? 3 : 1,
-                      ),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child:
-                        isSelected
-                            ? const Icon(
-                              Icons.check,
-                              color: Colors.white,
-                              size: 20,
-                            )
-                            : null,
-                  ),
-                );
-              }).toList(),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Selected: ${style.color.name}',
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildIconSelection(BuildContext context, GeometryStyle style) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Icon',
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: 100,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: KmlIcon.values.length,
-            itemBuilder: (context, index) {
-              final icon = KmlIcon.values[index];
-              final isSelected = icon == style.icon;
-
-              return GestureDetector(
-                onTap: () => _updateDefaultStyle(style.copyWith(icon: icon)),
-                child: Container(
-                  width: 80,
-                  margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: isSelected ? Colors.blue : Colors.grey[300]!,
-                      width: isSelected ? 2 : 1,
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                    color: isSelected ? Colors.blue[50] : null,
-                  ),
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: Image.network(
-                          icon.url,
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Icon(
-                              Icons.place,
-                              color: Colors.grey[400],
-                              size: 32,
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        icon.displayName,
-                        style: Theme.of(context).textTheme.bodySmall,
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
+        const Spacer(),
+        if (_currentOptions.useRuleBasedStyling &&
+            _currentOptions.rules.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              '${_currentOptions.rules.length} rules',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).primaryColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Selected: ${style.icon?.displayName ?? 'Default Icon'}',
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
-        ),
       ],
     );
   }
 
-  Widget _buildLineWidthSelection(BuildContext context, GeometryStyle style) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Line Width',
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        Row(
+  Widget _buildDefaultStyleSection(BuildContext context) {
+    return Card(
+      color: Colors.grey[50],
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Slider(
-                value: style.lineWidth,
-                min: 1.0,
-                max: 10.0,
-                divisions: 9,
-                label: '${style.lineWidth.toInt()}px',
-                onChanged:
-                    (value) =>
-                        _updateDefaultStyle(style.copyWith(lineWidth: value)),
-              ),
+            Text(
+              'Default Style',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
-            const SizedBox(width: 8),
-            Text('${style.lineWidth.toInt()}px'),
+            const SizedBox(height: 8),
+            Text(
+              'Applied to features that don\'t match any custom rules',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 16),
+            StyleEditorWidget(
+              geometryType: widget.geometryType,
+              initialStyle: _currentOptions.defaultStyle,
+              onStyleChanged: _updateDefaultStyle,
+            ),
           ],
         ),
-      ],
+      ),
     );
   }
 
-  Widget _buildOpacitySelection(BuildContext context, GeometryStyle style) {
+  Widget _buildRuleBasedStylingSection(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Fill Opacity',
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
         Row(
           children: [
-            Expanded(
-              child: Slider(
-                value: style.opacity,
-                min: 0.0,
-                max: 1.0,
-                divisions: 10,
-                label: '${(style.opacity * 100).toInt()}%',
-                onChanged:
-                    (value) =>
-                        _updateDefaultStyle(style.copyWith(opacity: value)),
-              ),
+            Text(
+              'Criteria-Based Styling',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
-            const SizedBox(width: 8),
-            Text('${(style.opacity * 100).toInt()}%'),
+            const Spacer(),
+            Switch(
+              value: _currentOptions.useRuleBasedStyling,
+              onChanged: _toggleRuleBasedStyling,
+            ),
           ],
         ),
+        const SizedBox(height: 8),
+        Text(
+          'Apply different styles based on column values using custom criteria',
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+        ),
+
+        if (_currentOptions.useRuleBasedStyling) ...[
+          const SizedBox(height: 16),
+          _buildColumnSelection(context),
+
+          if (_currentOptions.stylingColumn != null) ...[
+            const SizedBox(height: 16),
+            if (widget.previewColumnValues != null)
+              _buildColumnPreview(context),
+            const SizedBox(height: 16),
+            _buildRulesSection(context),
+            const SizedBox(height: 16),
+            _buildRuleValidation(context),
+          ],
+        ],
       ],
     );
   }
 
-  Widget _buildColumnValuesPreview(BuildContext context) {
+  Widget _buildColumnSelection(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Column Values Preview',
+          'Select Column for Styling Rules',
           style: Theme.of(
             context,
           ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         Container(
-          padding: const EdgeInsets.all(12),
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: Colors.blue[50],
+            border: Border.all(color: Colors.grey[300]!),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.blue[200]!),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Found ${widget.previewColumnValues!.length} unique values:',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children:
-                    widget.previewColumnValues!.take(10).map((value) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.blue[300]!),
-                        ),
-                        child: Text(
-                          value,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      );
-                    }).toList(),
-              ),
-              if (widget.previewColumnValues!.length > 10) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'and ${widget.previewColumnValues!.length - 10} more...',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontStyle: FontStyle.italic,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
-            ],
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _currentOptions.stylingColumn,
+              hint: const Text('Choose a column...'),
+              isExpanded: true,
+              items:
+                  widget.availableColumns.map((column) {
+                    return DropdownMenuItem<String>(
+                      value: column,
+                      child: Text(column),
+                    );
+                  }).toList(),
+              onChanged: _updateStylingColumn,
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildStyleRulesSection(BuildContext context) {
+  Widget _buildColumnPreview(BuildContext context) {
+    final values = widget.previewColumnValues!;
+    final uniqueValues = values.toSet().toList()..sort();
+
+    return Card(
+      color: Colors.blue[50],
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Column Values Preview',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Colors.blue[800],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Found ${uniqueValues.length} unique values (${values.length} total):',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children:
+                  uniqueValues.take(15).map((value) {
+                    final isNumeric = double.tryParse(value) != null;
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color:
+                              isNumeric
+                                  ? Colors.green[300]!
+                                  : Colors.blue[300]!,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isNumeric)
+                            Icon(
+                              Icons.numbers,
+                              size: 12,
+                              color: Colors.green[600],
+                            ),
+                          if (isNumeric) const SizedBox(width: 4),
+                          Text(
+                            value,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+            ),
+            if (uniqueValues.length > 15) ...[
+              const SizedBox(height: 8),
+              Text(
+                'and ${uniqueValues.length - 15} more...',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontStyle: FontStyle.italic,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRulesSection(BuildContext context) {
+    final columnRules = _currentOptions.rulesForColumn;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -658,75 +301,104 @@ class _StylingOptionsPanelState extends State<StylingOptionsPanel> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Style Rules',
+              'Styling Rules',
               style: Theme.of(
                 context,
               ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
-            TextButton.icon(
-              onPressed: _addNewStyleRule,
+            ElevatedButton.icon(
+              onPressed: _addNewRule,
               icon: const Icon(Icons.add, size: 16),
               label: const Text('Add Rule'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+              ),
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
 
-        if (_currentOptions.columnBasedStyles.isEmpty) ...[
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey[300]!),
-            ),
-            child: Column(
-              children: [
-                Icon(Icons.palette, color: Colors.grey[400], size: 48),
-                const SizedBox(height: 8),
-                Text(
-                  'No custom style rules yet',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Add rules to style features based on column values',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: Colors.grey[500]),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
+        if (columnRules.isEmpty) ...[
+          _buildEmptyRulesState(context),
         ] else ...[
-          ..._currentOptions.columnBasedStyles.entries.map((entry) {
-            return _buildStyleRuleCard(context, entry.key, entry.value);
-          }),
+          ...columnRules.map((rule) => _buildRuleCard(context, rule)),
         ],
       ],
     );
   }
 
-  Widget _buildStyleRuleCard(
-    BuildContext context,
-    String value,
-    GeometryStyle style,
-  ) {
+  Widget _buildEmptyRulesState(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Center(
+        child: Column(
+          children: [
+            Icon(Icons.rule, color: Colors.grey[400], size: 48),
+            const SizedBox(height: 12),
+            Text(
+              'No styling rules yet',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Add rules to style features based on column criteria',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: Colors.grey[500]),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRuleCard(BuildContext context, StylingRule rule) {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
+      elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            // Visual indicator
+            // Priority indicator
             Container(
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: style.color.color,
+                color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Center(
+                child: Text(
+                  '${rule.priority}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).primaryColor,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+
+            // Style preview
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: rule.style.color.color,
                 border: Border.all(color: Colors.grey),
                 borderRadius: BorderRadius.circular(
                   widget.geometryType == GeometryType.point ? 16 : 4,
@@ -734,14 +406,14 @@ class _StylingOptionsPanelState extends State<StylingOptionsPanel> {
               ),
               child:
                   widget.geometryType == GeometryType.point &&
-                          style.icon != null
+                          rule.style.icon != null
                       ? ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: Image.network(
-                          style.icon!.url,
+                          rule.style.icon!.url,
                           fit: BoxFit.contain,
                           errorBuilder: (context, error, stackTrace) {
-                            return Icon(
+                            return const Icon(
                               Icons.place,
                               color: Colors.white,
                               size: 16,
@@ -753,20 +425,20 @@ class _StylingOptionsPanelState extends State<StylingOptionsPanel> {
             ),
             const SizedBox(width: 12),
 
-            // Rule details
+            // Rule description
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'When "${_currentOptions.stylingColumn}" = "$value"',
+                    rule.displayDescription,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _getStyleDescription(style),
+                    _getStyleDescription(rule.style),
                     style: Theme.of(
                       context,
                     ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
@@ -775,21 +447,50 @@ class _StylingOptionsPanelState extends State<StylingOptionsPanel> {
               ),
             ),
 
+            // Enabled toggle
+            Switch(
+              value: rule.isEnabled,
+              onChanged: (enabled) => _toggleRuleEnabled(rule.id, enabled),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+
             // Actions
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  onPressed: () => _editStyleRule(value, style),
-                  icon: const Icon(Icons.edit, size: 16),
-                  tooltip: 'Edit rule',
-                ),
-                IconButton(
-                  onPressed: () => _deleteStyleRule(value),
-                  icon: const Icon(Icons.delete, size: 16),
-                  tooltip: 'Delete rule',
-                ),
-              ],
+            PopupMenuButton<String>(
+              onSelected: (action) => _handleRuleAction(rule, action),
+              itemBuilder:
+                  (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, size: 16),
+                          SizedBox(width: 8),
+                          Text('Edit'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'duplicate',
+                      child: Row(
+                        children: [
+                          Icon(Icons.copy, size: 16),
+                          SizedBox(width: 8),
+                          Text('Duplicate'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 16, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Delete', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
+              child: const Icon(Icons.more_vert),
             ),
           ],
         ),
@@ -797,140 +498,76 @@ class _StylingOptionsPanelState extends State<StylingOptionsPanel> {
     );
   }
 
-  Widget _buildStylePreviewRow(
-    BuildContext context,
-    String label,
-    GeometryStyle style, {
-    bool isDefault = false,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          // Visual indicator
-          Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              color: style.color.color,
-              border: Border.all(color: Colors.grey),
-              borderRadius: BorderRadius.circular(
-                widget.geometryType == GeometryType.point ? 12 : 3,
-              ),
-            ),
-            child:
-                widget.geometryType == GeometryType.point && style.icon != null
-                    ? ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        style.icon!.url,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Icon(
-                            Icons.place,
-                            color: Colors.white,
-                            size: 12,
-                          );
-                        },
-                      ),
-                    )
-                    : null,
-          ),
-          const SizedBox(width: 12),
+  Widget _buildRuleValidation(BuildContext context) {
+    if (widget.previewColumnValues == null) return const SizedBox.shrink();
 
-          // Label
-          Expanded(
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: isDefault ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-          ),
+    final validation = _currentOptions.validateRules(
+      widget.previewColumnValues!,
+    );
 
-          // Style details
-          Text(
-            _getStyleSummary(style),
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
-          ),
-        ],
+    return Card(
+      color:
+          validation.hasUnmatchedValues ? Colors.orange[50] : Colors.green[50],
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  validation.hasUnmatchedValues
+                      ? Icons.warning
+                      : Icons.check_circle,
+                  color:
+                      validation.hasUnmatchedValues
+                          ? Colors.orange[600]
+                          : Colors.green[600],
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Rule Validation',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color:
+                        validation.hasUnmatchedValues
+                            ? Colors.orange[800]
+                            : Colors.green[800],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            Text(
+              'Matched: ${validation.totalMatchedValues} values',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+
+            if (validation.hasUnmatchedValues) ...[
+              Text(
+                'Unmatched: ${validation.unmatchedCount} values (will use default style)',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: Colors.orange[700]),
+              ),
+            ],
+
+            if (validation.hasOverlappingRules) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Warning: Some values match multiple rules. Highest priority rule will be used.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.orange[700],
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
-  }
-
-  // Helper methods
-  /*
-  Widget _getGeometryIcon(GeometryType type) {
-    IconData iconData;
-    Color iconColor;
-
-    switch (type) {
-      case GeometryType.point:
-        iconData = Icons.place;
-        iconColor = Colors.red;
-        break;
-      case GeometryType.lineString:
-        iconData = Icons.timeline;
-        iconColor = Colors.blue;
-        break;
-      case GeometryType.polygon:
-        iconData = Icons.crop_free;
-        iconColor = Colors.green;
-        break;
-      default:
-        iconData = Icons.location_on;
-        iconColor = Colors.grey;
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: iconColor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Icon(iconData, color: iconColor, size: 24),
-    );
-  }
-
-  String _getGeometryDescription(GeometryType type) {
-    switch (type) {
-      case GeometryType.point:
-        return 'Individual points representing specific locations with coordinates';
-      case GeometryType.lineString:
-        return 'Connected lines showing paths, routes, or linear features';
-      case GeometryType.polygon:
-        return 'Closed shapes representing areas, boundaries, or regions';
-      default:
-        return 'Geographic features for mapping applications';
-    }
-  }
-
-  String _getGeometryHelpText(GeometryType type) {
-    switch (type) {
-      case GeometryType.point:
-        return 'Each row in your CSV will create a single point placemark';
-      case GeometryType.lineString:
-        return 'Coordinates will be connected in sequence to form continuous lines';
-      case GeometryType.polygon:
-        return 'Coordinates will form closed shapes with fill and border styling';
-      default:
-        return 'Configure how your CSV data will be visualized';
-    }
-  }
-*/
-  String _getStyleSummary(GeometryStyle style) {
-    switch (widget.geometryType) {
-      case GeometryType.point:
-        return style.icon?.displayName ?? 'Default Icon';
-      case GeometryType.lineString:
-        return '${style.lineWidth.toInt()}px line';
-      case GeometryType.polygon:
-        return '${style.lineWidth.toInt()}px, ${(style.opacity * 100).toInt()}% fill';
-      default:
-        return style.color.name;
-    }
   }
 
   String _getStyleDescription(GeometryStyle style) {
@@ -954,7 +591,6 @@ class _StylingOptionsPanelState extends State<StylingOptionsPanel> {
   }
 
   // Event handlers
-
   void _updateDefaultStyle(GeometryStyle newStyle) {
     setState(() {
       _currentOptions = _currentOptions.copyWith(defaultStyle: newStyle);
@@ -962,12 +598,12 @@ class _StylingOptionsPanelState extends State<StylingOptionsPanel> {
     widget.onStylingChanged(_currentOptions);
   }
 
-  void _updateColumnBasedStyling(bool enabled) {
+  void _toggleRuleBasedStyling(bool enabled) {
     setState(() {
       _currentOptions = _currentOptions.copyWith(
-        useColumnBasedStyling: enabled,
+        useRuleBasedStyling: enabled,
         stylingColumn: enabled ? _currentOptions.stylingColumn : null,
-        columnBasedStyles: enabled ? _currentOptions.columnBasedStyles : {},
+        rules: enabled ? _currentOptions.rules : [],
       );
     });
     widget.onStylingChanged(_currentOptions);
@@ -977,7 +613,7 @@ class _StylingOptionsPanelState extends State<StylingOptionsPanel> {
     setState(() {
       _currentOptions = _currentOptions.copyWith(
         stylingColumn: column,
-        columnBasedStyles: {}, // Clear existing rules when column changes
+        rules: [], // Clear existing rules when column changes
       );
     });
     widget.onStylingChanged(_currentOptions);
@@ -988,24 +624,19 @@ class _StylingOptionsPanelState extends State<StylingOptionsPanel> {
     }
   }
 
-  void _addNewStyleRule() {
+  void _addNewRule() {
     if (_currentOptions.stylingColumn == null) return;
 
     showDialog(
       context: context,
       builder:
-          (context) => StyleRuleDialog(
+          (context) => EnhancedRuleDialog(
             geometryType: widget.geometryType,
             columnName: _currentOptions.stylingColumn!,
-            onSave: (value, style) {
+            availableValues: widget.previewColumnValues ?? [],
+            onSave: (rule) {
               setState(() {
-                final newRules = Map<String, GeometryStyle>.from(
-                  _currentOptions.columnBasedStyles,
-                );
-                newRules[value] = style;
-                _currentOptions = _currentOptions.copyWith(
-                  columnBasedStyles: newRules,
-                );
+                _currentOptions = _currentOptions.addRule(rule);
               });
               widget.onStylingChanged(_currentOptions);
             },
@@ -1013,420 +644,91 @@ class _StylingOptionsPanelState extends State<StylingOptionsPanel> {
     );
   }
 
-  void _editStyleRule(String value, GeometryStyle style) {
-    showDialog(
-      context: context,
-      builder:
-          (context) => StyleRuleDialog(
-            geometryType: widget.geometryType,
-            columnName: _currentOptions.stylingColumn!,
-            initialValue: value,
-            initialStyle: style,
-            onSave: (newValue, newStyle) {
-              setState(() {
-                final newRules = Map<String, GeometryStyle>.from(
-                  _currentOptions.columnBasedStyles,
-                );
-                if (newValue != value) {
-                  newRules.remove(value);
-                }
-                newRules[newValue] = newStyle;
-                _currentOptions = _currentOptions.copyWith(
-                  columnBasedStyles: newRules,
-                );
-              });
-              widget.onStylingChanged(_currentOptions);
-            },
-          ),
-    );
-  }
+  void _toggleRuleEnabled(String ruleId, bool enabled) {
+    final rule = _currentOptions.rules.firstWhere((r) => r.id == ruleId);
+    final updatedRule = rule.copyWith(isEnabled: enabled);
 
-  void _deleteStyleRule(String value) {
     setState(() {
-      final newRules = Map<String, GeometryStyle>.from(
-        _currentOptions.columnBasedStyles,
-      );
-      newRules.remove(value);
-      _currentOptions = _currentOptions.copyWith(columnBasedStyles: newRules);
+      _currentOptions = _currentOptions.updateRule(ruleId, updatedRule);
     });
     widget.onStylingChanged(_currentOptions);
   }
-}
 
-// Style Rule Dialog for adding/editing column-based styles
-class StyleRuleDialog extends StatefulWidget {
-  final GeometryType geometryType;
-  final String columnName;
-  final String? initialValue;
-  final GeometryStyle? initialStyle;
-  final Function(String value, GeometryStyle style) onSave;
-
-  const StyleRuleDialog({
-    super.key,
-    required this.geometryType,
-    required this.columnName,
-    this.initialValue,
-    this.initialStyle,
-    required this.onSave,
-  });
-
-  @override
-  State<StyleRuleDialog> createState() => _StyleRuleDialogState();
-}
-
-class _StyleRuleDialogState extends State<StyleRuleDialog> {
-  late TextEditingController _valueController;
-  late GeometryStyle _currentStyle;
-
-  @override
-  void initState() {
-    super.initState();
-    _valueController = TextEditingController(text: widget.initialValue ?? '');
-    _currentStyle =
-        widget.initialStyle ??
-        StylingOptions.forGeometry(widget.geometryType).defaultStyle;
+  void _handleRuleAction(StylingRule rule, String action) {
+    switch (action) {
+      case 'edit':
+        _editRule(rule);
+        break;
+      case 'duplicate':
+        _duplicateRule(rule);
+        break;
+      case 'delete':
+        _deleteRule(rule);
+        break;
+    }
   }
 
-  @override
-  void dispose() {
-    _valueController.dispose();
-    super.dispose();
+  void _editRule(StylingRule rule) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => EnhancedRuleDialog(
+            geometryType: widget.geometryType,
+            columnName: _currentOptions.stylingColumn!,
+            availableValues: widget.previewColumnValues ?? [],
+            initialRule: rule,
+            onSave: (updatedRule) {
+              setState(() {
+                _currentOptions = _currentOptions.updateRule(
+                  rule.id,
+                  updatedRule,
+                );
+              });
+              widget.onStylingChanged(_currentOptions);
+            },
+          ),
+    );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text('${widget.initialValue != null ? 'Edit' : 'Add'} Style Rule'),
-      content: SizedBox(
-        width: 400,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Column value input
-              Text(
-                'When "${widget.columnName}" equals:',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+  void _duplicateRule(StylingRule rule) {
+    final duplicatedRule = rule.copyWith(
+      id: 'rule_${DateTime.now().millisecondsSinceEpoch}',
+      priority: rule.priority + 1,
+    );
+
+    setState(() {
+      _currentOptions = _currentOptions.addRule(duplicatedRule);
+    });
+    widget.onStylingChanged(_currentOptions);
+  }
+
+  void _deleteRule(StylingRule rule) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Delete Rule'),
+            content: Text(
+              'Are you sure you want to delete this rule?\n\n${rule.displayDescription}',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
               ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _valueController,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  hintText: 'Enter column value',
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Style configuration
-              Text(
-                'Apply this style:',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 16),
-
-              // Color selection
-              _buildDialogColorSelection(),
-
-              const SizedBox(height: 16),
-
-              // Icon selection (for points)
-              if (widget.geometryType == GeometryType.point) ...[
-                _buildDialogIconSelection(),
-                const SizedBox(height: 16),
-              ],
-
-              // Line width (for lines and polygons)
-              if (widget.geometryType == GeometryType.lineString ||
-                  widget.geometryType == GeometryType.polygon) ...[
-                _buildDialogLineWidthSelection(),
-                const SizedBox(height: 16),
-              ],
-
-              // Opacity (for polygons)
-              if (widget.geometryType == GeometryType.polygon) ...[
-                _buildDialogOpacitySelection(),
-                const SizedBox(height: 16),
-              ],
-
-              // Style preview
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey[300]!),
-                ),
-                child: Row(
-                  children: [
-                    Text(
-                      'Preview:',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: _currentStyle.color.color,
-                        border: Border.all(color: Colors.grey),
-                        borderRadius: BorderRadius.circular(
-                          widget.geometryType == GeometryType.point ? 12 : 3,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _getStyleDescription(),
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ),
-                  ],
-                ),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _currentOptions = _currentOptions.removeRule(rule.id);
+                  });
+                  widget.onStylingChanged(_currentOptions);
+                  Navigator.of(context).pop();
+                },
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Delete'),
               ),
             ],
           ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: _canSave() ? _saveRule : null,
-          child: const Text('Save'),
-        ),
-      ],
     );
-  }
-
-  Widget _buildDialogColorSelection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Color:',
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children:
-              KmlColor.predefinedColors.take(12).map((color) {
-                final isSelected =
-                    color.kmlValue == _currentStyle.color.kmlValue;
-                return GestureDetector(
-                  onTap:
-                      () => setState(() {
-                        _currentStyle = _currentStyle.copyWith(color: color);
-                      }),
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: color.color,
-                      border: Border.all(
-                        color: isSelected ? Colors.black : Colors.grey[300]!,
-                        width: isSelected ? 2 : 1,
-                      ),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child:
-                        isSelected
-                            ? const Icon(
-                              Icons.check,
-                              color: Colors.white,
-                              size: 16,
-                            )
-                            : null,
-                  ),
-                );
-              }).toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDialogIconSelection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Icon:',
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: 80,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: KmlIcon.values.length,
-            itemBuilder: (context, index) {
-              final icon = KmlIcon.values[index];
-              final isSelected = icon == _currentStyle.icon;
-
-              return GestureDetector(
-                onTap:
-                    () => setState(() {
-                      _currentStyle = _currentStyle.copyWith(icon: icon);
-                    }),
-                child: Container(
-                  width: 60,
-                  margin: const EdgeInsets.only(right: 6),
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: isSelected ? Colors.blue : Colors.grey[300]!,
-                      width: isSelected ? 2 : 1,
-                    ),
-                    borderRadius: BorderRadius.circular(6),
-                    color: isSelected ? Colors.blue[50] : null,
-                  ),
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: Image.network(
-                          icon.url,
-                          fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Icon(
-                              Icons.place,
-                              color: Colors.grey[400],
-                              size: 20,
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        icon.displayName,
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodySmall?.copyWith(fontSize: 8),
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDialogLineWidthSelection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Line Width:',
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: Slider(
-                value: _currentStyle.lineWidth,
-                min: 1.0,
-                max: 10.0,
-                divisions: 9,
-                label: '${_currentStyle.lineWidth.toInt()}px',
-                onChanged:
-                    (value) => setState(() {
-                      _currentStyle = _currentStyle.copyWith(lineWidth: value);
-                    }),
-              ),
-            ),
-            Text('${_currentStyle.lineWidth.toInt()}px'),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDialogOpacitySelection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Fill Opacity:',
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: Slider(
-                value: _currentStyle.opacity,
-                min: 0.0,
-                max: 1.0,
-                divisions: 10,
-                label: '${(_currentStyle.opacity * 100).toInt()}%',
-                onChanged:
-                    (value) => setState(() {
-                      _currentStyle = _currentStyle.copyWith(opacity: value);
-                    }),
-              ),
-            ),
-            Text('${(_currentStyle.opacity * 100).toInt()}%'),
-          ],
-        ),
-      ],
-    );
-  }
-
-  String _getStyleDescription() {
-    final parts = <String>[];
-    parts.add(_currentStyle.color.name);
-
-    if (_currentStyle.icon != null) {
-      parts.add(_currentStyle.icon!.displayName);
-    }
-
-    if (widget.geometryType == GeometryType.lineString ||
-        widget.geometryType == GeometryType.polygon) {
-      parts.add('${_currentStyle.lineWidth.toInt()}px line');
-    }
-
-    if (widget.geometryType == GeometryType.polygon) {
-      parts.add('${(_currentStyle.opacity * 100).toInt()}% opacity');
-    }
-
-    return parts.join(', ');
-  }
-
-  bool _canSave() {
-    return _valueController.text.trim().isNotEmpty;
-  }
-
-  void _saveRule() {
-    final value = _valueController.text.trim();
-    if (value.isNotEmpty) {
-      widget.onSave(value, _currentStyle);
-      Navigator.of(context).pop();
-    }
   }
 }

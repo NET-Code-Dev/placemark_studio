@@ -4,7 +4,7 @@ import '../../../../core/enums/geometry_type.dart';
 import '../../../../data/models/csv_data.dart';
 import '../../../../data/models/styling_rule.dart';
 import '../../../../data/models/styling_options.dart';
-import 'enhanced_styling_panel.dart';
+import 'styling_panel.dart';
 
 /// Integration widget that handles the migration from old to new styling system
 class StylingIntegration extends StatefulWidget {
@@ -73,7 +73,7 @@ class _StylingIntegrationState extends State<StylingIntegration> {
         ],
 
         // Enhanced styling panel
-        EnhancedStylingPanel(
+        StylingOptionsPanel(
           geometryType: widget.geometryType,
           availableColumns: widget.availableColumns,
           previewColumnValues: _previewColumnValues,

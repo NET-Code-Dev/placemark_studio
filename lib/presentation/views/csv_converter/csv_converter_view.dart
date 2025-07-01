@@ -38,7 +38,7 @@ class _CsvConverterContent extends StatelessWidget {
           return Column(
             children: [
               // Progress indicator
-              _buildProgressIndicator(context, viewModel),
+              //  _buildProgressIndicator(context, viewModel),
 
               // Main content area
               Expanded(

@@ -5,73 +5,42 @@ import 'kml_generation_options.dart' as kml_opts;
 
 /// Predefined icon options for KML placemarks
 enum KmlIcon {
-  yellowPushpin(
-    'Yellow Pushpin',
-    'http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png',
-  ),
-  redPushpin(
-    'Red Pushpin',
-    'http://maps.google.com/mapfiles/kml/pushpin/red-pushpin.png',
-  ),
-  bluePushpin(
-    'Blue Pushpin',
-    'http://maps.google.com/mapfiles/kml/pushpin/blue-pushpin.png',
-  ),
-  greenPushpin(
-    'Green Pushpin',
-    'http://maps.google.com/mapfiles/kml/pushpin/grn-pushpin.png',
-  ),
-  pinkPushpin(
-    'Pink Pushpin',
-    'http://maps.google.com/mapfiles/kml/pushpin/pink-pushpin.png',
-  ),
-  purplePushpin(
-    'Purple Pushpin',
-    'http://maps.google.com/mapfiles/kml/pushpin/purple-pushpin.png',
-  ),
-  orangePushpin(
-    'Orange Pushpin',
-    'http://maps.google.com/mapfiles/kml/pushpin/orange-pushpin.png',
-  ),
-  whitePushpin(
-    'White Pushpin',
+  pushpin(
+    'Pushpin',
     'http://maps.google.com/mapfiles/kml/pushpin/wht-pushpin.png',
   ),
 
-  // Shapes
-  yellowCircle(
-    'Yellow Circle',
-    'http://maps.google.com/mapfiles/kml/shapes/donut.png',
-  ),
-  redCircle(
-    'Red Circle',
-    'http://maps.google.com/mapfiles/kml/shapes/target.png',
-  ),
-  blueSquare(
-    'Blue Square',
-    'http://maps.google.com/mapfiles/kml/shapes/square.png',
-  ),
-  greenStar(
-    'Green Star',
-    'http://maps.google.com/mapfiles/kml/shapes/star.png',
+  placemarkCircle(
+    'Placemark Circle',
+    'https://maps.google.com/mapfiles/kml/shapes/placemark_circle.png',
   ),
 
-  // Transportation
-  car('Car', 'http://maps.google.com/mapfiles/kml/shapes/cabs.png'),
-  plane('Airplane', 'http://maps.google.com/mapfiles/kml/shapes/airports.png'),
-  boat('Boat', 'http://maps.google.com/mapfiles/kml/shapes/marina.png'),
-  train('Train', 'http://maps.google.com/mapfiles/kml/shapes/rail.png'),
-
-  // Places
-  home('Home', 'http://maps.google.com/mapfiles/kml/pal4/icon49.png'),
-  office('Office', 'http://maps.google.com/mapfiles/kml/pal4/icon26.png'),
-  school('School', 'http://maps.google.com/mapfiles/kml/pal4/icon12.png'),
-  hospital('Hospital', 'http://maps.google.com/mapfiles/kml/pal4/icon20.png'),
-  restaurant(
-    'Restaurant',
-    'http://maps.google.com/mapfiles/kml/pal4/icon23.png',
+  placemarkSquare(
+    'Placemark Square',
+    'https://maps.google.com/mapfiles/kml/shapes/placemark_square.png',
   ),
-  hotel('Hotel', 'http://maps.google.com/mapfiles/kml/pal4/icon24.png');
+
+  target('Target', 'http://maps.google.com/mapfiles/kml/shapes/target.png'),
+
+  donut('Donut', 'http://maps.google.com/mapfiles/kml/shapes/donut.png'),
+
+  square('Square', 'http://maps.google.com/mapfiles/kml/shapes/square.png'),
+
+  diamond(
+    'Diamond',
+    'https://maps.google.com/mapfiles/kml/shapes/open-diamond.png',
+  ),
+
+  triangle(
+    'Triangle',
+    'https://maps.google.com/mapfiles/kml/shapes/triangle.png',
+  ),
+
+  polygon('Polygon', 'https://maps.google.com/mapfiles/kml/shapes/polygon.png'),
+
+  arrow('Arrow', 'https://maps.google.com/mapfiles/kml/shapes/arrow.png'),
+
+  star('Star', 'http://maps.google.com/mapfiles/kml/shapes/star.png');
 
   const KmlIcon(this.displayName, this.url);
 
@@ -149,7 +118,7 @@ class GeometryStyle {
   /// Create style for point geometry
   factory GeometryStyle.point({
     KmlColor color = const KmlColor('Red', Color(0xFFFF0000), 'ff0000ff'),
-    KmlIcon icon = KmlIcon.yellowPushpin,
+    KmlIcon icon = KmlIcon.pushpin,
   }) {
     return GeometryStyle(color: color, icon: icon);
   }
@@ -268,7 +237,7 @@ class StylingOptions {
           columnName: stylingColumn!,
           columnValue: value,
           color: style.color.kmlValue,
-          iconUrl: style.icon?.url ?? KmlIcon.yellowPushpin.url,
+          iconUrl: style.icon?.url ?? KmlIcon.pushpin.url,
         );
       }
     }

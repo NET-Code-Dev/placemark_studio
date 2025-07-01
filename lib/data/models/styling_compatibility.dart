@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import '../../core/enums/geometry_type.dart';
 import 'kml_generation_options.dart' as kml_opts;
 import 'styling_options.dart';
@@ -79,7 +78,7 @@ class StylingCompatibility {
           'columnValue': rule.value,
           'operator': rule.operator.symbol,
           'color': rule.style.color.kmlValue,
-          'iconUrl': rule.style.icon?.url ?? KmlIcon.yellowPushpin.url,
+          'iconUrl': rule.style.icon?.url ?? KmlIcon.pushpin.url,
           'priority': rule.priority,
         };
       }
@@ -156,7 +155,7 @@ class EnhancedStylingOptionsWrapper extends StylingOptions {
             columnName: _enhanced.stylingColumn!,
             columnValue: rule.value,
             color: rule.style.color.kmlValue,
-            iconUrl: rule.style.icon?.url ?? KmlIcon.yellowPushpin.url,
+            iconUrl: rule.style.icon?.url ?? KmlIcon.pushpin.url,
           );
         }
       }
