@@ -5,6 +5,7 @@ import '../../data/services/kml_parser_service.dart';
 import '../../data/services/csv_export_service.dart';
 import '../../data/services/csv_parser_service.dart';
 import '../../data/services/kml_generation_service.dart';
+import '../../data/services/enhanced_kml_generation_service.dart';
 import '../../data/services/bounding_box_service.dart';
 import '../../presentation/viewmodels/home_viewmodel.dart';
 import '../../presentation/viewmodels/extract_viewmodel.dart';
@@ -28,10 +29,15 @@ class ServiceLocator {
       () => BoundingBoxService(),
     );
 
-    // New CSV Services
+    // CSV Services (both legacy and enhanced)
     getIt.registerLazySingleton<ICsvParserService>(() => CsvParserService());
     getIt.registerLazySingleton<IKmlGenerationService>(
       () => KmlGenerationService(),
+    );
+
+    // NEW: Enhanced KML Generation Service
+    getIt.registerLazySingleton<IEnhancedKmlGenerationService>(
+      () => EnhancedKmlGenerationService(),
     );
 
     // Existing ViewModels
@@ -49,11 +55,13 @@ class ServiceLocator {
 
     getIt.registerFactory<CreateViewModel>(() => CreateViewModel());
 
-    // New CSV Converter ViewModel
+    // UPDATED: CSV Converter ViewModel with enhanced service
     getIt.registerFactory<CsvConverterViewModel>(
       () => CsvConverterViewModel(
         csvParserService: getIt<ICsvParserService>(),
         kmlGenerationService: getIt<IKmlGenerationService>(),
+        enhancedKmlGenerationService:
+            getIt<IEnhancedKmlGenerationService>(), // Add this line
       ),
     );
   }

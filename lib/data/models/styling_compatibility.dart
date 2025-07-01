@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/enums/geometry_type.dart';
+import 'kml_generation_options.dart' as kml_opts;
 import 'styling_options.dart';
 import 'styling_rule.dart';
 
@@ -143,8 +144,25 @@ class EnhancedStylingOptionsWrapper extends StylingOptions {
 
   /// Override toStyleRules to support enhanced rules
   @override
-  Map<String, dynamic> toStyleRules() {
-    return StylingCompatibility.toLegacyStyleRules(_enhanced);
+  Map<String, kml_opts.StyleRule> toStyleRules() {
+    // Convert the enhanced styling to legacy StyleRule objects
+    final rules = <String, kml_opts.StyleRule>{};
+
+    if (_enhanced.useRuleBasedStyling && _enhanced.stylingColumn != null) {
+      for (final rule in _enhanced.rules.where((r) => r.isEnabled)) {
+        // Only include equality rules for backward compatibility
+        if (rule.operator == RuleOperator.equals) {
+          rules['style_${rule.id}'] = kml_opts.StyleRule(
+            columnName: _enhanced.stylingColumn!,
+            columnValue: rule.value,
+            color: rule.style.color.kmlValue,
+            iconUrl: rule.style.icon?.url ?? KmlIcon.yellowPushpin.url,
+          );
+        }
+      }
+    }
+
+    return rules;
   }
 }
 

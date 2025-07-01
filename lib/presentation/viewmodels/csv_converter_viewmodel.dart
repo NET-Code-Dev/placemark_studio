@@ -5,8 +5,11 @@ import '../../../data/models/csv_data.dart';
 import '../../../data/models/column_mapping.dart';
 import '../../../data/models/kml_generation_options.dart';
 import '../../../data/models/styling_options.dart';
+import '../../../data/models/styling_rule.dart';
+import '../../../data/models/styling_compatibility.dart';
 import '../../../data/services/csv_parser_service.dart';
 import '../../../data/services/kml_generation_service.dart';
+import '../../../data/services/enhanced_kml_generation_service.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/enums/geometry_type.dart';
 import '../../../core/enums/export_format.dart';
@@ -16,12 +19,16 @@ import 'base_viewmodel.dart';
 class CsvConverterViewModel extends BaseViewModel {
   final ICsvParserService _csvParserService;
   final IKmlGenerationService _kmlGenerationService;
+  final IEnhancedKmlGenerationService _enhancedKmlGenerationService;
 
   CsvConverterViewModel({
     required ICsvParserService csvParserService,
     required IKmlGenerationService kmlGenerationService,
+    IEnhancedKmlGenerationService? enhancedKmlGenerationService,
   }) : _csvParserService = csvParserService,
-       _kmlGenerationService = kmlGenerationService;
+       _kmlGenerationService = kmlGenerationService,
+       _enhancedKmlGenerationService =
+           enhancedKmlGenerationService ?? EnhancedKmlGenerationService();
 
   // State variables
   File? _selectedFile;
@@ -37,6 +44,15 @@ class CsvConverterViewModel extends BaseViewModel {
   StylingOptions _stylingOptions = StylingOptions.forGeometry(
     GeometryType.point,
   );
+
+  // Enhanced styling support
+  EnhancedStylingOptions? _enhancedStylingOptions;
+  bool _useEnhancedStyling = false;
+
+  // Output path options
+  String? _customOutputPath;
+  bool _useDefaultLocation = true;
+
   String? _outputPath;
   List<String>? _previewColumnValues;
 
@@ -53,6 +69,20 @@ class CsvConverterViewModel extends BaseViewModel {
   String? get outputPath => _outputPath;
   List<String>? get previewColumnValues => _previewColumnValues;
 
+  // Enhanced styling getters
+  EnhancedStylingOptions get enhancedStylingOptions =>
+      _enhancedStylingOptions ??
+      StylingCompatibility.createEnhanced(
+        geometryType: _selectedGeometryType,
+        existingOptions: _stylingOptions,
+      );
+  bool get useEnhancedStyling => _useEnhancedStyling;
+
+  // Output path getters
+  String? get customOutputPath => _customOutputPath;
+  bool get useDefaultLocation => _useDefaultLocation;
+  String? get csvFilePath => _selectedFile?.path;
+
   bool get hasCsvData => _csvData != null;
   bool get hasValidMapping => _columnMapping?.isValid ?? false;
   bool get canProceedToPreview => hasCsvData && hasValidMapping;
@@ -63,6 +93,38 @@ class CsvConverterViewModel extends BaseViewModel {
   List<String> get availableColumns => _csvData?.headers ?? [];
   List<Map<String, dynamic>> get previewData =>
       _csvData?.rows.take(10).toList() ?? [];
+
+  // Default filename based on CSV name and export format
+  String get defaultFileName {
+    if (_selectedFile == null) return 'converted_data.kml';
+
+    final baseName = path.basenameWithoutExtension(_selectedFile!.path);
+    final extension =
+        _selectedExportFormat == ExportFormat.kmz ? '.kmz' : '.kml';
+    return '$baseName$extension';
+  }
+
+  // Final output path (either custom or default location)
+  String get finalOutputPath {
+    if (!_useDefaultLocation && _customOutputPath != null) {
+      return _customOutputPath!;
+    } else if (_selectedFile != null) {
+      final csvDir = path.dirname(_selectedFile!.path);
+      return path.join(csvDir, defaultFileName);
+    } else {
+      // Fallback to downloads directory
+      return path.join(_getDownloadsDirectory(), defaultFileName);
+    }
+  }
+
+  /// Get platform-specific downloads directory
+  String _getDownloadsDirectory() {
+    if (Platform.isWindows) {
+      return path.join(Platform.environment['USERPROFILE'] ?? '.', 'Downloads');
+    } else {
+      return path.join(Platform.environment['HOME'] ?? '.', 'Downloads');
+    }
+  }
 
   /// Pick and process CSV file
   Future<void> pickCsvFile() async {
@@ -375,10 +437,33 @@ class CsvConverterViewModel extends BaseViewModel {
     }
   }
 
-  /// Set export format
+  /// Set custom output path
+  void setCustomOutputPath(String? outputPath) {
+    _customOutputPath = outputPath;
+    notifyListeners();
+  }
+
+  /// Toggle between default location (same as CSV) and custom location
+  void setUseDefaultLocation(bool useDefault) {
+    _useDefaultLocation = useDefault;
+    if (useDefault) {
+      _customOutputPath = null; // Clear custom path when switching to default
+    }
+    notifyListeners();
+  }
+
+  /// Set export format and update default filename
   void setExportFormat(ExportFormat format) {
     if (_selectedExportFormat != format) {
       _selectedExportFormat = format;
+
+      // Update custom output path if it exists to match new extension
+      if (_customOutputPath != null) {
+        final directory = path.dirname(_customOutputPath!);
+        final newFileName = defaultFileName;
+        _customOutputPath = path.join(directory, newFileName);
+      }
+
       notifyListeners();
     }
   }
@@ -389,9 +474,27 @@ class CsvConverterViewModel extends BaseViewModel {
     notifyListeners();
   }
 
-  /// Update styling options
+  /// Update styling options (legacy method)
   void updateStylingOptions(StylingOptions options) {
     _stylingOptions = options;
+    _useEnhancedStyling = false;
+    notifyListeners();
+  }
+
+  /// Update enhanced styling options (new method)
+  void updateEnhancedStylingOptions(EnhancedStylingOptions options) {
+    _enhancedStylingOptions = options;
+    _useEnhancedStyling = true;
+    // Also update legacy styling for backward compatibility
+    _stylingOptions = StylingCompatibility.toLegacy(options);
+
+    if (kDebugMode) {
+      print('Enhanced styling updated:');
+      print('  Rules: ${options.rules.length}');
+      print('  Column: ${options.stylingColumn}');
+      print('  Rule-based: ${options.useRuleBasedStyling}');
+    }
+
     notifyListeners();
   }
 
@@ -417,7 +520,6 @@ class CsvConverterViewModel extends BaseViewModel {
     notifyListeners();
   }
 
-  /// Export CSV data to KML file
   Future<void> exportToKml() async {
     if (!canExport) {
       setError('Cannot export: Data validation failed');
@@ -429,7 +531,6 @@ class CsvConverterViewModel extends BaseViewModel {
       _successMessage = null;
       setLoading();
 
-      // Validate data one more time before export
       if (_csvData == null || _columnMapping == null) {
         throw ConversionException(
           'Missing required data for export',
@@ -437,34 +538,87 @@ class CsvConverterViewModel extends BaseViewModel {
         );
       }
 
-      // Update generation options with current settings including styling
-      final exportOptions = _generationOptions.copyWith(
-        geometryType: _selectedGeometryType,
-        documentName:
-            _generationOptions.documentName.isNotEmpty
-                ? _generationOptions.documentName
-                : 'Converted from ${_csvData!.fileName}',
-        documentDescription:
-            _generationOptions.documentDescription.isNotEmpty
-                ? _generationOptions.documentDescription
-                : 'Generated by Placemark Studio from CSV data',
-        useCustomIcons: _stylingOptions.useColumnBasedStyling,
-        styleRules:
-            _stylingOptions.useColumnBasedStyling
-                ? _stylingOptions.toStyleRules()
-                : null,
-      );
+      final documentName =
+          _generationOptions.documentName.isNotEmpty
+              ? _generationOptions.documentName
+              : 'Converted from ${_csvData!.fileName}';
 
-      // Generate KML file
-      final outputFile = await _kmlGenerationService.generateKml(
-        csvData: _csvData!,
-        columnMapping: _columnMapping!,
-        options: exportOptions,
-      );
+      final documentDescription =
+          _generationOptions.documentDescription.isNotEmpty
+              ? _generationOptions.documentDescription
+              : 'Generated by Placemark Studio from CSV data';
+
+      // Determine final output path
+      final outputFilePath = finalOutputPath;
+
+      // Ensure output directory exists
+      final outputDir = Directory(path.dirname(outputFilePath));
+      if (!await outputDir.exists()) {
+        await outputDir.create(recursive: true);
+      }
+
+      late File outputFile;
+
+      // Check if we should use enhanced styling
+      if (_useEnhancedStyling &&
+          _enhancedStylingOptions != null &&
+          _enhancedStylingOptions!.useRuleBasedStyling &&
+          _enhancedStylingOptions!.rules.isNotEmpty) {
+        if (kDebugMode) {
+          print('Using Enhanced KML Generation Service');
+          print(
+            'Enhanced styling rules: ${_enhancedStylingOptions!.rules.length}',
+          );
+          print('Output path: $outputFilePath');
+        }
+
+        // Use enhanced service for rule-based styling
+        outputFile = await _enhancedKmlGenerationService.generateKmlWithRules(
+          csvData: _csvData!,
+          columnMapping: _columnMapping!,
+          stylingOptions: _enhancedStylingOptions!,
+          documentName: documentName,
+          documentDescription: documentDescription,
+          geometryType: _selectedGeometryType,
+          includeElevation: _generationOptions.includeElevation,
+          includeDescription: _generationOptions.includeDescription,
+        );
+
+        // Move file to desired location if generated elsewhere
+        if (outputFile.path != outputFilePath) {
+          final finalFile = File(outputFilePath);
+          await outputFile.copy(finalFile.path);
+          await outputFile.delete(); // Clean up temp file
+          outputFile = finalFile;
+        }
+      } else {
+        if (kDebugMode) {
+          print('Using Legacy KML Generation Service');
+          print('Output path: $outputFilePath');
+        }
+
+        // Use legacy service for simple styling
+        final exportOptions = _generationOptions.copyWith(
+          geometryType: _selectedGeometryType,
+          documentName: documentName,
+          documentDescription: documentDescription,
+          useCustomIcons: _stylingOptions.useColumnBasedStyling,
+          styleRules:
+              _stylingOptions.useColumnBasedStyling
+                  ? _stylingOptions.toStyleRules()
+                  : null,
+          outputPath: outputFilePath, // Set custom output path
+        );
+
+        outputFile = await _kmlGenerationService.generateKml(
+          csvData: _csvData!,
+          columnMapping: _columnMapping!,
+          options: exportOptions,
+        );
+      }
 
       _outputPath = outputFile.path;
 
-      // Count successful exports for user feedback
       final validRowCount = _csvData!.validRowCount;
       _successMessage =
           'KML file exported successfully!\n'
@@ -477,8 +631,10 @@ class CsvConverterViewModel extends BaseViewModel {
 
       if (kDebugMode) {
         print('KML export completed successfully');
-        print('Output path: ${outputFile.path}');
+        print('Final output path: ${outputFile.path}');
         print('File size: ${await outputFile.length()} bytes');
+        print('Enhanced styling used: $_useEnhancedStyling');
+        print('Used default location: $_useDefaultLocation');
       }
     } on AppException catch (e) {
       setError('Export failed: ${e.message}', e);
@@ -490,7 +646,7 @@ class CsvConverterViewModel extends BaseViewModel {
     }
   }
 
-  /// Export CSV data to KMZ file (for future milestone)
+  /// Export CSV data to KMZ file with enhanced styling support
   Future<void> exportToKmz({List<File>? imageFiles}) async {
     if (!canExport) {
       setError('Cannot export: Data validation failed');
@@ -509,31 +665,66 @@ class CsvConverterViewModel extends BaseViewModel {
         );
       }
 
-      // Update generation options
-      final exportOptions = _generationOptions.copyWith(
-        geometryType: _selectedGeometryType,
-        documentName:
-            _generationOptions.documentName.isNotEmpty
-                ? _generationOptions.documentName
-                : 'Converted from ${_csvData!.fileName}',
-        documentDescription:
-            _generationOptions.documentDescription.isNotEmpty
-                ? _generationOptions.documentDescription
-                : 'Generated by Placemark Studio from CSV data with images',
-        useCustomIcons: _stylingOptions.useColumnBasedStyling,
-        styleRules:
-            _stylingOptions.useColumnBasedStyling
-                ? _stylingOptions.toStyleRules()
-                : null,
-      );
+      final documentName =
+          _generationOptions.documentName.isNotEmpty
+              ? _generationOptions.documentName
+              : 'Converted from ${_csvData!.fileName}';
 
-      // Generate KMZ file
-      final outputFile = await _kmlGenerationService.generateKmz(
-        csvData: _csvData!,
-        columnMapping: _columnMapping!,
-        options: exportOptions,
-        imageFiles: imageFiles,
-      );
+      final documentDescription =
+          _generationOptions.documentDescription.isNotEmpty
+              ? _generationOptions.documentDescription
+              : 'Generated by Placemark Studio from CSV data with images';
+
+      late File outputFile;
+
+      // Check if we should use enhanced styling
+      if (_useEnhancedStyling &&
+          _enhancedStylingOptions != null &&
+          _enhancedStylingOptions!.useRuleBasedStyling &&
+          _enhancedStylingOptions!.rules.isNotEmpty) {
+        if (kDebugMode) {
+          print('Using Enhanced KMZ Generation Service');
+          print(
+            'Enhanced styling rules: ${_enhancedStylingOptions!.rules.length}',
+          );
+        }
+
+        // Use enhanced service for rule-based styling
+        outputFile = await _enhancedKmlGenerationService.generateKmzWithRules(
+          csvData: _csvData!,
+          columnMapping: _columnMapping!,
+          stylingOptions: _enhancedStylingOptions!,
+          documentName: documentName,
+          documentDescription: documentDescription,
+          geometryType: _selectedGeometryType,
+          imageFiles: imageFiles,
+          includeElevation: _generationOptions.includeElevation,
+          includeDescription: _generationOptions.includeDescription,
+        );
+      } else {
+        if (kDebugMode) {
+          print('Using Legacy KMZ Generation Service');
+        }
+
+        // Use legacy service for simple styling
+        final exportOptions = _generationOptions.copyWith(
+          geometryType: _selectedGeometryType,
+          documentName: documentName,
+          documentDescription: documentDescription,
+          useCustomIcons: _stylingOptions.useColumnBasedStyling,
+          styleRules:
+              _stylingOptions.useColumnBasedStyling
+                  ? _stylingOptions.toStyleRules()
+                  : null,
+        );
+
+        outputFile = await _kmlGenerationService.generateKmz(
+          csvData: _csvData!,
+          columnMapping: _columnMapping!,
+          options: exportOptions,
+          imageFiles: imageFiles,
+        );
+      }
 
       _outputPath = outputFile.path;
 
@@ -553,6 +744,7 @@ class CsvConverterViewModel extends BaseViewModel {
         print('KMZ export completed successfully');
         print('Output path: ${outputFile.path}');
         print('Images included: $imageCount');
+        print('Enhanced styling used: $_useEnhancedStyling');
       }
     } on AppException catch (e) {
       setError('Export failed: ${e.message}', e);
@@ -597,6 +789,8 @@ class CsvConverterViewModel extends BaseViewModel {
     _selectedExportFormat = ExportFormat.kml;
     _generationOptions = const KmlGenerationOptions();
     _stylingOptions = StylingOptions.forGeometry(GeometryType.point);
+    _enhancedStylingOptions = null;
+    _useEnhancedStyling = false;
     _previewColumnValues = null;
 
     clearError();

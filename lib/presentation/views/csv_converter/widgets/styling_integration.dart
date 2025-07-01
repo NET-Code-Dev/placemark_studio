@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:placemark_studio/data/services/enhanced_kml_generation_service.dart';
 import '../../../../core/enums/geometry_type.dart';
 import '../../../../data/models/csv_data.dart';
 import '../../../../data/models/styling_rule.dart';
@@ -132,7 +133,10 @@ class _StylingIntegrationState extends State<StylingIntegration> {
   }
 
   Widget _buildValidationSummary() {
-    final validation = _currentOptions.validateAgainstData(widget.csvData!);
+    final validation = _currentOptions.validateAgainstData(
+      widget.csvData!.rows, // First argument: List<Map<String, dynamic>>
+      widget.csvData!.headers, // Second argument: List<String>
+    );
 
     return Card(
       color:

@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../viewmodels/csv_converter_viewmodel.dart';
@@ -6,8 +7,9 @@ import '../../../core/enums/export_format.dart';
 import '../../../core/enums/geometry_type.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/column_mapping.dart';
-import 'widgets/styling_panel.dart';
-//import 'widgets/geometry_type_selector.dart';
+import '../../../data/models/styling_compatibility.dart';
+import 'widgets/styling_integration.dart'; // Updated import
+import 'widgets/export_options_step.dart';
 
 class CsvConverterView extends StatelessWidget {
   const CsvConverterView({super.key});
@@ -141,6 +143,7 @@ class _CsvConverterContent extends StatelessWidget {
         return _buildDataPreviewStep(context, viewModel);
       case ConversionStep.geometryAndStyling:
         return _buildGeometryAndStylingStep(context, viewModel);
+      // ADD THIS CASE - this is what's missing!
       case ConversionStep.exportOptions:
         return _buildExportOptionsStep(context, viewModel);
       case ConversionStep.exportComplete:
@@ -385,37 +388,30 @@ class _CsvConverterContent extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
-          Row(
-            children: [
-              Icon(
-                Icons.palette,
-                color: Theme.of(context).primaryColor,
-                size: 28,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Geometry & Styling',
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.bold),
+          // Step description
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Geometry & Styling Configuration',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
                     ),
-                    Text(
-                      'Configure the appearance and geometry type for your KML output',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Choose the geometry type and configure styling rules for your KML output.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
 
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
 
           // Geometry type selection
           Card(
@@ -430,86 +426,80 @@ class _CsvConverterContent extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Choose how your coordinate data will be represented',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
-                  ),
                   const SizedBox(height: 16),
-
-                  // Geometry type options
-                  ...GeometryType.values
-                      .where((type) => type.isSupportedForCsvConversion)
-                      .map((type) {
-                        final isSelected =
-                            viewModel.selectedGeometryType == type;
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color:
-                                  isSelected
-                                      ? Theme.of(context).primaryColor
-                                      : Colors.grey[300]!,
-                              width: isSelected ? 2 : 1,
-                            ),
-                            borderRadius: BorderRadius.circular(8),
-                            color:
-                                isSelected
-                                    ? Theme.of(
-                                      context,
-                                    ).primaryColor.withValues(alpha: 0.05)
-                                    : null,
-                          ),
-                          child: RadioListTile<GeometryType>(
-                            title: Row(
-                              children: [
-                                _getGeometryIcon(type, isSelected),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        type.displayName,
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.bodyLarge?.copyWith(
-                                          fontWeight: FontWeight.w600,
+                  Row(
+                    children:
+                        GeometryType.values
+                            .where((type) => type.isSupportedForCsvConversion)
+                            .map((type) {
+                              final isSelected =
+                                  viewModel.selectedGeometryType == type;
+                              return Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                  ),
+                                  child: InkWell(
+                                    onTap:
+                                        () => viewModel.setGeometryType(type),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            isSelected
+                                                ? Theme.of(context).primaryColor
+                                                    .withValues(alpha: 0.1)
+                                                : Colors.grey[100],
+                                        border: Border.all(
                                           color:
                                               isSelected
                                                   ? Theme.of(
                                                     context,
                                                   ).primaryColor
-                                                  : null,
+                                                  : Colors.grey[300]!,
+                                          width: isSelected ? 2 : 1,
                                         ),
+                                        borderRadius: BorderRadius.circular(8),
                                       ),
-                                      Text(
-                                        type.description,
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall
-                                            ?.copyWith(color: Colors.grey[600]),
+                                      child: Column(
+                                        children: [
+                                          _getGeometryIcon(type, isSelected),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            type.displayName,
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.bodyMedium?.copyWith(
+                                              fontWeight:
+                                                  isSelected
+                                                      ? FontWeight.bold
+                                                      : FontWeight.normal,
+                                              color:
+                                                  isSelected
+                                                      ? Theme.of(
+                                                        context,
+                                                      ).primaryColor
+                                                      : null,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            type.description,
+                                            style:
+                                                Theme.of(
+                                                  context,
+                                                ).textTheme.bodySmall,
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ],
                                       ),
-                                    ],
+                                    ),
                                   ),
                                 ),
-                              ],
-                            ),
-                            value: type,
-                            groupValue: viewModel.selectedGeometryType,
-                            onChanged:
-                                (value) => viewModel.setGeometryType(value!),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                          ),
-                        );
-                      }),
+                              );
+                            })
+                            .toList(),
+                  ),
                 ],
               ),
             ),
@@ -517,20 +507,123 @@ class _CsvConverterContent extends StatelessWidget {
 
           const SizedBox(height: 24),
 
-          // Complete styling options panel
-          StylingOptionsPanel(
+          // UPDATED: Enhanced styling integration
+          StylingIntegration(
             geometryType: viewModel.selectedGeometryType,
-            stylingOptions: viewModel.currentStylingOptions,
+            csvData: viewModel.csvData,
             availableColumns: viewModel.availableColumns,
-            previewColumnValues: viewModel.previewColumnValues,
-            onStylingChanged: viewModel.updateStylingOptions,
-            onPreviewColumn: viewModel.previewColumnValuesForStyling,
+            onStylingChanged: (enhancedOptions) {
+              // Use the new enhanced styling method
+              viewModel.updateEnhancedStylingOptions(enhancedOptions);
+            },
+            initialOptions: viewModel.enhancedStylingOptions,
           ),
 
           const SizedBox(height: 24),
 
           // Real-time validation section
           _buildValidationSection(context, viewModel),
+        ],
+      ),
+    );
+  }
+
+  // Add debug information panel
+  Widget _buildValidationSection(
+    BuildContext context,
+    CsvConverterViewModel viewModel,
+  ) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Export Configuration Summary',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+
+            if (viewModel.csvData != null) ...[
+              _buildInfoRow('Total rows', '${viewModel.csvData!.rows.length}'),
+              _buildInfoRow(
+                'Valid coordinates',
+                '${viewModel.csvData!.validRowCount}',
+              ),
+              _buildInfoRow(
+                'Geometry type',
+                viewModel.selectedGeometryType.displayName,
+              ),
+
+              // Enhanced styling information
+              if (viewModel.useEnhancedStyling &&
+                  viewModel.enhancedStylingOptions.useRuleBasedStyling) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green[200]!),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.check_circle,
+                            color: Colors.green[600],
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Enhanced Styling Active',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: Colors.green[800],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      _buildInfoRow(
+                        'Styling column',
+                        viewModel.enhancedStylingOptions.stylingColumn ??
+                            'None',
+                      ),
+                      _buildInfoRow(
+                        'Active rules',
+                        '${viewModel.enhancedStylingOptions.rules.where((r) => r.isEnabled).length}',
+                      ),
+                      _buildInfoRow(
+                        'Total rules',
+                        '${viewModel.enhancedStylingOptions.rules.length}',
+                      ),
+                    ],
+                  ),
+                ),
+              ] else ...[
+                _buildInfoRow('Styling', 'Default styling will be applied'),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
+          Text(value, style: const TextStyle(color: Colors.grey)),
         ],
       ),
     );
@@ -575,201 +668,6 @@ class _CsvConverterContent extends StatelessWidget {
     );
   }
 
-  Widget _buildValidationSection(
-    BuildContext context,
-    CsvConverterViewModel viewModel,
-  ) {
-    final hasErrors = viewModel.errorMessage != null;
-    final hasSuccess = viewModel.successMessage != null;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.verified,
-                  color: Theme.of(context).primaryColor,
-                  size: 24,
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'Real-time Validation',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Validation status
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color:
-                    hasErrors
-                        ? Colors.red[50]
-                        : hasSuccess
-                        ? Colors.green[50]
-                        : Colors.blue[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color:
-                      hasErrors
-                          ? Colors.red[200]!
-                          : hasSuccess
-                          ? Colors.green[200]!
-                          : Colors.blue[200]!,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        hasErrors
-                            ? Icons.error_outline
-                            : hasSuccess
-                            ? Icons.check_circle_outline
-                            : Icons.info_outline,
-                        color:
-                            hasErrors
-                                ? Colors.red[600]
-                                : hasSuccess
-                                ? Colors.green[600]
-                                : Colors.blue[600],
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          hasErrors
-                              ? 'Configuration Issues Detected'
-                              : hasSuccess
-                              ? 'Configuration Valid'
-                              : 'Configuration Status',
-                          style: Theme.of(
-                            context,
-                          ).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color:
-                                hasErrors
-                                    ? Colors.red[700]
-                                    : hasSuccess
-                                    ? Colors.green[700]
-                                    : Colors.blue[700],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  if (hasErrors) ...[
-                    Text(
-                      viewModel.errorMessage!,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: Colors.red[600]),
-                    ),
-                  ] else if (hasSuccess) ...[
-                    Text(
-                      viewModel.successMessage!,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: Colors.green[600]),
-                    ),
-                  ] else ...[
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildValidationItem(
-                          context,
-                          'Geometry Type',
-                          '${viewModel.selectedGeometryType.displayName} selected',
-                          true,
-                        ),
-                        const SizedBox(height: 4),
-                        _buildValidationItem(
-                          context,
-                          'Default Styling',
-                          'Color: ${viewModel.currentStylingOptions.defaultStyle.color.name}',
-                          true,
-                        ),
-                        const SizedBox(height: 4),
-                        _buildValidationItem(
-                          context,
-                          'Column-based Styling',
-                          viewModel.currentStylingOptions.useColumnBasedStyling
-                              ? 'Enabled (${viewModel.currentStylingOptions.columnBasedStyles.length} rules)'
-                              : 'Using default styling only',
-                          true,
-                        ),
-                        const SizedBox(height: 4),
-                        _buildValidationItem(
-                          context,
-                          'Export Readiness',
-                          viewModel.canExport
-                              ? 'Ready for export'
-                              : 'Complete configuration to enable export',
-                          viewModel.canExport,
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Manual validation button
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Validate your configuration before proceeding to export',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
-                ),
-                ElevatedButton.icon(
-                  onPressed:
-                      viewModel.isLoading
-                          ? null
-                          : () {
-                            viewModel.validateData();
-                          },
-                  icon:
-                      viewModel.isLoading
-                          ? SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                          : Icon(Icons.check_circle, size: 16),
-                  label: Text(
-                    viewModel.isLoading ? 'Validating...' : 'Validate',
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildValidationItem(
     BuildContext context,
     String label,
@@ -801,65 +699,381 @@ class _CsvConverterContent extends StatelessWidget {
     BuildContext context,
     CsvConverterViewModel viewModel,
   ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Export Options',
-          style: Theme.of(
-            context,
-          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 24),
-
-        // Export format selection
-        Text(
-          'Export Format',
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        ...ExportFormat.values
-            .where((format) => format.isSupportedForCsvConversion)
-            .map(
-              (format) => RadioListTile<ExportFormat>(
-                title: Text(format.displayName),
-                subtitle: Text(format.description),
-                value: format,
-                groupValue: viewModel.selectedExportFormat,
-                onChanged: (value) => viewModel.setExportFormat(value!),
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Step description
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Export Options',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Configure output format and location for your converted file.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
               ),
             ),
-
-        const SizedBox(height: 32),
-
-        // Export summary
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.blue[50],
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.blue[200]!),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Export Summary',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+
+          const SizedBox(height: 24),
+
+          // Export format selection
+          _buildFormatSelector(context, viewModel),
+
+          const SizedBox(height: 24),
+
+          // Output path selection
+          _buildOutputPathSelector(context, viewModel),
+
+          const SizedBox(height: 24),
+
+          // Export summary
+          _buildExportSummary(context, viewModel),
+        ],
+      ),
+    );
+  }
+
+  // Add these helper methods to your csv_converter_view.dart:
+
+  Widget _buildFormatSelector(
+    BuildContext context,
+    CsvConverterViewModel viewModel,
+  ) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Output Format',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+
+            Row(
+              children: [
+                // KML option
+                Expanded(
+                  child: RadioListTile<ExportFormat>(
+                    value: ExportFormat.kml,
+                    groupValue: viewModel.selectedExportFormat,
+                    onChanged: (format) {
+                      if (format != null) {
+                        viewModel.setExportFormat(format);
+                      }
+                    },
+                    title: const Text('KML'),
+                    subtitle: const Text(
+                      'Keyhole Markup Language\nStandard format for Google Earth',
+                    ),
+                    dense: true,
+                  ),
+                ),
+
+                // KMZ option
+                Expanded(
+                  child: RadioListTile<ExportFormat>(
+                    value: ExportFormat.kmz,
+                    groupValue: viewModel.selectedExportFormat,
+                    onChanged: (format) {
+                      if (format != null) {
+                        viewModel.setExportFormat(format);
+                      }
+                    },
+                    title: const Text('KMZ'),
+                    subtitle: const Text(
+                      'Compressed KML\nSmaller file size, supports images',
+                    ),
+                    dense: true,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOutputPathSelector(
+    BuildContext context,
+    CsvConverterViewModel viewModel,
+  ) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Output Location',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+
+            // Location options
+            Column(
+              children: [
+                // Same directory as CSV option
+                RadioListTile<bool>(
+                  value: true,
+                  groupValue: viewModel.useDefaultLocation,
+                  onChanged: (value) {
+                    if (value != null) {
+                      viewModel.setUseDefaultLocation(value);
+                    }
+                  },
+                  title: const Text('Same folder as CSV file'),
+                  subtitle: Text(
+                    viewModel.csvFilePath != null
+                        ? 'Save in: ${viewModel.csvFilePath!.split('/').last.split('\\').last.replaceAll(RegExp(r'\.[^.]*$'), '')}'
+                        : 'Save in the same folder as your CSV file',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                  ),
+                  dense: true,
+                ),
+
+                // Custom location option
+                RadioListTile<bool>(
+                  value: false,
+                  groupValue: viewModel.useDefaultLocation,
+                  onChanged: (value) {
+                    if (value != null) {
+                      viewModel.setUseDefaultLocation(value);
+                      if (!value) {
+                        _selectCustomPath(context, viewModel);
+                      }
+                    }
+                  },
+                  title: const Text('Choose custom location'),
+                  subtitle: const Text(
+                    'Select a different folder for the output file',
+                  ),
+                  dense: true,
+                ),
+              ],
+            ),
+
+            // Custom path selector (only shown when custom location is selected)
+            if (!viewModel.useDefaultLocation) ...[
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      readOnly: true,
+                      decoration: InputDecoration(
+                        hintText:
+                            viewModel.customOutputPath != null
+                                ? viewModel.customOutputPath!
+                                    .split('/')
+                                    .last
+                                    .split('\\')
+                                    .last
+                                : 'Click Browse to select location',
+                        prefixIcon: const Icon(Icons.folder_outlined),
+                        border: const OutlineInputBorder(),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                      ),
+                      controller: TextEditingController(
+                        text:
+                            viewModel.customOutputPath != null
+                                ? viewModel.customOutputPath!
+                                    .split('/')
+                                    .last
+                                    .split('\\')
+                                    .last
+                                : '',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  SizedBox(
+                    width: 100,
+                    child: ElevatedButton(
+                      onPressed: () => _selectCustomPath(context, viewModel),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text('Browse'),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              ...viewModel.exportInfo.entries.map(
-                (entry) => Text('${entry.key}: ${entry.value}'),
+            ],
+
+            const SizedBox(height: 16),
+
+            // Preview of final output path
+            _buildPathPreview(context, viewModel),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPathPreview(
+    BuildContext context,
+    CsvConverterViewModel viewModel,
+  ) {
+    final String finalPath = viewModel.finalOutputPath;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.info_outline, size: 16, color: Colors.grey[600]),
+              const SizedBox(width: 8),
+              Text(
+                'Output Preview',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[700],
+                ),
               ),
             ],
           ),
-        ),
-      ],
+          const SizedBox(height: 8),
+          SelectableText(
+            finalPath,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              fontFamily: 'monospace',
+              color: Colors.grey[800],
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  Widget _buildExportSummary(
+    BuildContext context,
+    CsvConverterViewModel viewModel,
+  ) {
+    return Card(
+      color: Colors.green[50],
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green[600]),
+                const SizedBox(width: 8),
+                Text(
+                  'Ready to Export',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green[800],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            _buildSummaryRow(
+              'Format',
+              viewModel.selectedExportFormat.name.toUpperCase(),
+            ),
+            _buildSummaryRow(
+              'Geometry',
+              viewModel.selectedGeometryType.displayName,
+            ),
+            _buildSummaryRow('Output file', viewModel.defaultFileName),
+
+            if (viewModel.useDefaultLocation && viewModel.csvFilePath != null)
+              _buildSummaryRow('Location', 'Same folder as CSV file')
+            else if (viewModel.customOutputPath != null)
+              _buildSummaryRow(
+                'Location',
+                viewModel.customOutputPath!.split('/').last.split('\\').first,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              '$label:',
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Colors.green,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(value, style: const TextStyle(color: Colors.green)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _selectCustomPath(
+    BuildContext context,
+    CsvConverterViewModel viewModel,
+  ) async {
+    try {
+      final String? outputPath = await FilePicker.platform.saveFile(
+        dialogTitle: 'Choose output location',
+        fileName: viewModel.defaultFileName,
+        type: FileType.custom,
+        allowedExtensions: ['kml', 'kmz'],
+      );
+
+      if (outputPath != null) {
+        viewModel.setCustomOutputPath(outputPath);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to select output path: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildExportCompleteStep(
