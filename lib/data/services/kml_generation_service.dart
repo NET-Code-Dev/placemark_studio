@@ -344,7 +344,17 @@ class KmlGenerationService implements IKmlGenerationService {
     buffer.writeln('    </LineString>');
     buffer.writeln('  </Placemark>');
 
-    onStats(1, skippedCount); // 1 placemark created
+    // Report statistics: 1 placemark created, but track coordinates processed/skipped
+    // Report placemark count (consistent with current approach)
+    onStats(1, skippedCount);
+
+    // Log the coordinate processing for debugging:
+    if (kDebugMode) {
+      print('LineString generation completed:');
+      print('  Coordinates processed: $processedCount');
+      print('  Coordinates skipped: $skippedCount');
+      print('  Placemarks created: 1');
+    }
   }
 
   /// Generate single Polygon placemark from all valid CSV coordinates
@@ -439,7 +449,17 @@ class KmlGenerationService implements IKmlGenerationService {
     buffer.writeln('    </Polygon>');
     buffer.writeln('  </Placemark>');
 
+    // Report statistics: 1 placemark created, but track coordinates processed/skipped
+    // Option 1: Report placemark count
     onStats(1, skippedCount); // 1 placemark created
+
+    // Log the coordinate processing for debugging:
+    if (kDebugMode) {
+      print('Polygon generation completed:');
+      print('  Coordinates processed: $processedCount');
+      print('  Coordinates skipped: $skippedCount');
+      print('  Placemarks created: 1');
+    }
   }
 
   /// Create a point placemark from a CSV row

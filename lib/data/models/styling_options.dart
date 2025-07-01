@@ -108,10 +108,10 @@ class KmlColor {
 
   /// Convert Flutter Color to KML color format (AABBGGRR)
   static String colorToKml(Color color) {
-    final alpha = color.alpha.toRadixString(16).padLeft(2, '0');
-    final blue = color.blue.toRadixString(16).padLeft(2, '0');
-    final green = color.green.toRadixString(16).padLeft(2, '0');
-    final red = color.red.toRadixString(16).padLeft(2, '0');
+    final alpha = (color.a * 255).round().toRadixString(16).padLeft(2, '0');
+    final blue = (color.b * 255).round().toRadixString(16).padLeft(2, '0');
+    final green = (color.g * 255).round().toRadixString(16).padLeft(2, '0');
+    final red = (color.r * 255).round().toRadixString(16).padLeft(2, '0');
     return '$alpha$blue$green$red';
   }
 

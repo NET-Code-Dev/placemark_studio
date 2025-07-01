@@ -6,8 +6,8 @@ import '../../../core/enums/export_format.dart';
 import '../../../core/enums/geometry_type.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/column_mapping.dart';
-import 'widgets/geometry_type_selector.dart';
-import 'widgets/styling_options_panel.dart';
+import 'widgets/styling_panel.dart';
+//import 'widgets/geometry_type_selector.dart';
 
 class CsvConverterView extends StatelessWidget {
   const CsvConverterView({super.key});
@@ -61,7 +61,7 @@ class _CsvConverterContent extends StatelessWidget {
   ) {
     return Container(
       padding: const EdgeInsets.all(16),
-      color: Theme.of(context).primaryColor.withOpacity(0.1),
+      color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
       child: Column(
         children: [
           Text(
@@ -381,36 +381,418 @@ class _CsvConverterContent extends StatelessWidget {
     BuildContext context,
     CsvConverterViewModel viewModel,
   ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Geometry & Styling',
-          style: Theme.of(
-            context,
-          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 24),
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Icon(
+                Icons.palette,
+                color: Theme.of(context).primaryColor,
+                size: 28,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Geometry & Styling',
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      'Configure the appearance and geometry type for your KML output',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
 
-        // Geometry type selection
-        Text(
-          'Geometry Type',
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        ...GeometryType.values
-            .where((type) => type.isSupportedForCsvConversion)
-            .map(
-              (type) => RadioListTile<GeometryType>(
-                title: Text(type.displayName),
-                subtitle: Text(type.description),
-                value: type,
-                groupValue: viewModel.selectedGeometryType,
-                onChanged: (value) => viewModel.setGeometryType(value!),
+          const SizedBox(height: 32),
+
+          // Geometry type selection
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Geometry Type',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Choose how your coordinate data will be represented',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Geometry type options
+                  ...GeometryType.values
+                      .where((type) => type.isSupportedForCsvConversion)
+                      .map((type) {
+                        final isSelected =
+                            viewModel.selectedGeometryType == type;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color:
+                                  isSelected
+                                      ? Theme.of(context).primaryColor
+                                      : Colors.grey[300]!,
+                              width: isSelected ? 2 : 1,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                            color:
+                                isSelected
+                                    ? Theme.of(
+                                      context,
+                                    ).primaryColor.withValues(alpha: 0.05)
+                                    : null,
+                          ),
+                          child: RadioListTile<GeometryType>(
+                            title: Row(
+                              children: [
+                                _getGeometryIcon(type, isSelected),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        type.displayName,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodyLarge?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                          color:
+                                              isSelected
+                                                  ? Theme.of(
+                                                    context,
+                                                  ).primaryColor
+                                                  : null,
+                                        ),
+                                      ),
+                                      Text(
+                                        type.description,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(color: Colors.grey[600]),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            value: type,
+                            groupValue: viewModel.selectedGeometryType,
+                            onChanged:
+                                (value) => viewModel.setGeometryType(value!),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                          ),
+                        );
+                      }),
+                ],
               ),
             ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Complete styling options panel
+          StylingOptionsPanel(
+            geometryType: viewModel.selectedGeometryType,
+            stylingOptions: viewModel.currentStylingOptions,
+            availableColumns: viewModel.availableColumns,
+            previewColumnValues: viewModel.previewColumnValues,
+            onStylingChanged: viewModel.updateStylingOptions,
+            onPreviewColumn: viewModel.previewColumnValuesForStyling,
+          ),
+
+          const SizedBox(height: 24),
+
+          // Real-time validation section
+          _buildValidationSection(context, viewModel),
+        ],
+      ),
+    );
+  }
+
+  Widget _getGeometryIcon(GeometryType type, bool isSelected) {
+    IconData iconData;
+    Color iconColor;
+
+    switch (type) {
+      case GeometryType.point:
+        iconData = Icons.place;
+        iconColor = Colors.red;
+        break;
+      case GeometryType.lineString:
+        iconData = Icons.timeline;
+        iconColor = Colors.blue;
+        break;
+      case GeometryType.polygon:
+        iconData = Icons.crop_free;
+        iconColor = Colors.green;
+        break;
+      default:
+        iconData = Icons.location_on;
+        iconColor = Colors.grey;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color:
+            isSelected
+                ? iconColor.withValues(alpha: 0.2)
+                : iconColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(
+        iconData,
+        color: isSelected ? iconColor : iconColor.withValues(alpha: 0.7),
+        size: 24,
+      ),
+    );
+  }
+
+  Widget _buildValidationSection(
+    BuildContext context,
+    CsvConverterViewModel viewModel,
+  ) {
+    final hasErrors = viewModel.errorMessage != null;
+    final hasSuccess = viewModel.successMessage != null;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.verified,
+                  color: Theme.of(context).primaryColor,
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Real-time Validation',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Validation status
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color:
+                    hasErrors
+                        ? Colors.red[50]
+                        : hasSuccess
+                        ? Colors.green[50]
+                        : Colors.blue[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color:
+                      hasErrors
+                          ? Colors.red[200]!
+                          : hasSuccess
+                          ? Colors.green[200]!
+                          : Colors.blue[200]!,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        hasErrors
+                            ? Icons.error_outline
+                            : hasSuccess
+                            ? Icons.check_circle_outline
+                            : Icons.info_outline,
+                        color:
+                            hasErrors
+                                ? Colors.red[600]
+                                : hasSuccess
+                                ? Colors.green[600]
+                                : Colors.blue[600],
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          hasErrors
+                              ? 'Configuration Issues Detected'
+                              : hasSuccess
+                              ? 'Configuration Valid'
+                              : 'Configuration Status',
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color:
+                                hasErrors
+                                    ? Colors.red[700]
+                                    : hasSuccess
+                                    ? Colors.green[700]
+                                    : Colors.blue[700],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  if (hasErrors) ...[
+                    Text(
+                      viewModel.errorMessage!,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: Colors.red[600]),
+                    ),
+                  ] else if (hasSuccess) ...[
+                    Text(
+                      viewModel.successMessage!,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: Colors.green[600]),
+                    ),
+                  ] else ...[
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildValidationItem(
+                          context,
+                          'Geometry Type',
+                          '${viewModel.selectedGeometryType.displayName} selected',
+                          true,
+                        ),
+                        const SizedBox(height: 4),
+                        _buildValidationItem(
+                          context,
+                          'Default Styling',
+                          'Color: ${viewModel.currentStylingOptions.defaultStyle.color.name}',
+                          true,
+                        ),
+                        const SizedBox(height: 4),
+                        _buildValidationItem(
+                          context,
+                          'Column-based Styling',
+                          viewModel.currentStylingOptions.useColumnBasedStyling
+                              ? 'Enabled (${viewModel.currentStylingOptions.columnBasedStyles.length} rules)'
+                              : 'Using default styling only',
+                          true,
+                        ),
+                        const SizedBox(height: 4),
+                        _buildValidationItem(
+                          context,
+                          'Export Readiness',
+                          viewModel.canExport
+                              ? 'Ready for export'
+                              : 'Complete configuration to enable export',
+                          viewModel.canExport,
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // Manual validation button
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Validate your configuration before proceeding to export',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                ),
+                ElevatedButton.icon(
+                  onPressed:
+                      viewModel.isLoading
+                          ? null
+                          : () {
+                            viewModel.validateData();
+                          },
+                  icon:
+                      viewModel.isLoading
+                          ? SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                          : Icon(Icons.check_circle, size: 16),
+                  label: Text(
+                    viewModel.isLoading ? 'Validating...' : 'Validate',
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildValidationItem(
+    BuildContext context,
+    String label,
+    String value,
+    bool isValid,
+  ) {
+    return Row(
+      children: [
+        Icon(
+          isValid ? Icons.check : Icons.warning,
+          size: 16,
+          color: isValid ? Colors.green[600] : Colors.orange[600],
+        ),
+        const SizedBox(width: 8),
+        Text(
+          '$label: ',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        Expanded(
+          child: Text(value, style: Theme.of(context).textTheme.bodySmall),
+        ),
       ],
     );
   }
