@@ -8,6 +8,8 @@ import '../../core/enums/geometry_type.dart';
 import '../models/csv_data.dart';
 import '../models/column_mapping.dart';
 import '../models/kml_generation_options.dart';
+import '../models/styling_options.dart';
+import '../models/styling_rule.dart';
 
 abstract class IKmlGenerationService {
   Future<File> generateKml({
@@ -226,6 +228,50 @@ class KmlGenerationService implements IKmlGenerationService {
     }
 
     return buffer.toString();
+  }
+
+  /// Add styles including enhanced default styling
+  void _addStylesWithDefaults(
+    StringBuffer buffer,
+    EnhancedStylingOptions stylingOptions,
+  ) {
+    // Default style with user preferences
+    final defaultStyle = stylingOptions.defaultStyle;
+
+    buffer.writeln('<Style id="defaultStyle">');
+    buffer.writeln('  <IconStyle>');
+    buffer.writeln('    <color>${defaultStyle.color.kmlValue}</color>');
+    buffer.writeln('    <scale>${defaultStyle.scale}</scale>');
+    buffer.writeln('    <Icon>');
+    buffer.writeln(
+      '      <href>${defaultStyle.icon?.url ?? KmlIcon.pushpin.url}</href>',
+    );
+    buffer.writeln('    </Icon>');
+    buffer.writeln('  </IconStyle>');
+    buffer.writeln('  <LabelStyle>');
+    buffer.writeln('    <color>${defaultStyle.labelColor.kmlValue}</color>');
+    buffer.writeln('    <scale>${defaultStyle.labelScale}</scale>');
+    buffer.writeln('  </LabelStyle>');
+    buffer.writeln('</Style>');
+
+    // Add rule-based styles
+    for (final rule in stylingOptions.rules.where((r) => r.isEnabled)) {
+      buffer.writeln('<Style id="${rule.ruleId}">');
+      buffer.writeln('  <IconStyle>');
+      buffer.writeln('    <color>${rule.style.color.kmlValue}</color>');
+      buffer.writeln('    <scale>${rule.style.scale}</scale>');
+      buffer.writeln('    <Icon>');
+      buffer.writeln(
+        '      <href>${rule.style.icon?.url ?? KmlIcon.pushpin.url}</href>',
+      );
+      buffer.writeln('    </Icon>');
+      buffer.writeln('  </IconStyle>');
+      buffer.writeln('  <LabelStyle>');
+      buffer.writeln('    <color>${rule.style.labelColor.kmlValue}</color>');
+      buffer.writeln('    <scale>${rule.style.labelScale}</scale>');
+      buffer.writeln('  </LabelStyle>');
+      buffer.writeln('</Style>');
+    }
   }
 
   /// Generate individual point placemarks from CSV rows
@@ -542,68 +588,122 @@ class KmlGenerationService implements IKmlGenerationService {
 
   /// Add styles to KML document based on geometry type and options
   void _addStyles(StringBuffer buffer, KmlGenerationOptions options) {
-    // Default point style
+    // Default fallback values
+    String defaultColor = 'ff0000ff';
+    String defaultIconUrl =
+        'http://maps.google.com/mapfiles/kml/pushpin/wht-pushpin.png';
+    double defaultIconScale = 1.0; // NEW: Default icon scale
+    String defaultLabelColor = 'ff000000'; // NEW: Default label color
+    double defaultLabelScale = 0.9; // NEW: Default label scale
+
+    // FIXED: Get all styling properties from user's default style
+    if (options.useCustomIcons && options.styleRules.isNotEmpty) {
+      final defaultUserStyle = options.styleRules['defaultUserStyle'];
+      if (defaultUserStyle != null) {
+        defaultColor = defaultUserStyle.color;
+        defaultIconUrl = defaultUserStyle.iconUrl;
+        defaultIconScale =
+            defaultUserStyle.scale ?? 1.0; // NEW: Use user's icon scale
+        defaultLabelColor =
+            defaultUserStyle.labelColor ??
+            'ff000000'; // NEW: Use user's label color
+        defaultLabelScale =
+            defaultUserStyle.labelScale ?? 0.9; // NEW: Use user's label scale
+
+        if (kDebugMode) {
+          print('Using user default style: $defaultColor - $defaultIconUrl');
+          print(
+            'Icon scale: $defaultIconScale, Label: $defaultLabelColor @ ${defaultLabelScale}x',
+          );
+        }
+      } else {
+        // Fallback to first available rule
+        final firstRule = options.styleRules.values.first;
+        defaultColor = firstRule.color;
+        defaultIconUrl = firstRule.iconUrl;
+        defaultIconScale = firstRule.scale ?? 1.0; // NEW
+        defaultLabelColor = firstRule.labelColor ?? 'ff000000'; // NEW
+        defaultLabelScale = firstRule.labelScale ?? 0.9; // NEW
+      }
+    }
+
+    // Default point style - NOW USES ALL USER SELECTIONS
     buffer.writeln('<Style id="defaultStyle">');
     buffer.writeln('  <IconStyle>');
-    buffer.writeln('    <color>ff0000ff</color>'); // Red color
-    buffer.writeln('    <scale>1.0</scale>');
-    buffer.writeln('    <Icon>');
+    buffer.writeln('    <color>$defaultColor</color>');
     buffer.writeln(
-      '      <href>http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png</href>',
-    );
+      '    <scale>$defaultIconScale</scale>',
+    ); // FIXED: Use user's scale
+    buffer.writeln('    <Icon>');
+    buffer.writeln('      <href>$defaultIconUrl</href>');
     buffer.writeln('    </Icon>');
     buffer.writeln('  </IconStyle>');
     buffer.writeln('  <LabelStyle>');
-    buffer.writeln('    <color>ff000000</color>'); // Black labels
-    buffer.writeln('    <scale>0.9</scale>');
+    buffer.writeln(
+      '    <color>$defaultLabelColor</color>',
+    ); // FIXED: Use user's label color
+    buffer.writeln(
+      '    <scale>$defaultLabelScale</scale>',
+    ); // FIXED: Use user's label scale
     buffer.writeln('  </LabelStyle>');
     buffer.writeln('</Style>');
 
-    // LineString style
+    // LineString style - ALSO FIXED
     buffer.writeln('<Style id="lineStringStyle">');
     buffer.writeln('  <LineStyle>');
-    buffer.writeln(
-      '    <color>ff0000ff</color>',
-    ); // Red color (AABBGGRR format)
+    buffer.writeln('    <color>$defaultColor</color>');
     buffer.writeln('    <width>3</width>');
     buffer.writeln('  </LineStyle>');
     buffer.writeln('  <LabelStyle>');
-    buffer.writeln('    <color>ff000000</color>');
-    buffer.writeln('    <scale>0.9</scale>');
+    buffer.writeln('    <color>$defaultLabelColor</color>'); // FIXED
+    buffer.writeln('    <scale>$defaultLabelScale</scale>'); // FIXED
     buffer.writeln('  </LabelStyle>');
     buffer.writeln('</Style>');
 
-    // Polygon style
+    // Polygon style - ALSO FIXED
     buffer.writeln('<Style id="polygonStyle">');
     buffer.writeln('  <LineStyle>');
-    buffer.writeln('    <color>ff0000ff</color>'); // Red border
+    buffer.writeln('    <color>$defaultColor</color>');
     buffer.writeln('    <width>2</width>');
     buffer.writeln('  </LineStyle>');
     buffer.writeln('  <PolyStyle>');
-    buffer.writeln('    <color>7f0000ff</color>'); // Semi-transparent red fill
+    final transparentColor = '7f${defaultColor.substring(2)}';
+    buffer.writeln('    <color>$transparentColor</color>');
     buffer.writeln('    <fill>1</fill>');
     buffer.writeln('    <outline>1</outline>');
     buffer.writeln('  </PolyStyle>');
     buffer.writeln('  <LabelStyle>');
-    buffer.writeln('    <color>ff000000</color>');
-    buffer.writeln('    <scale>0.9</scale>');
+    buffer.writeln('    <color>$defaultLabelColor</color>'); // FIXED
+    buffer.writeln('    <scale>$defaultLabelScale</scale>'); // FIXED
     buffer.writeln('  </LabelStyle>');
     buffer.writeln('</Style>');
 
-    // Add custom styles from options
+    // Custom styles from criteria-based rules - ALSO FIXED
     if (options.useCustomIcons && options.styleRules.isNotEmpty) {
       for (final entry in options.styleRules.entries) {
         final styleId = entry.key;
         final rule = entry.value;
 
+        if (styleId == 'defaultUserStyle') continue;
+
         buffer.writeln('<Style id="$styleId">');
         buffer.writeln('  <IconStyle>');
         buffer.writeln('    <color>${rule.color}</color>');
-        buffer.writeln('    <scale>1.0</scale>');
+        buffer.writeln(
+          '    <scale>${rule.scale ?? defaultIconScale}</scale>',
+        ); // FIXED
         buffer.writeln('    <Icon>');
         buffer.writeln('      <href>${rule.iconUrl}</href>');
         buffer.writeln('    </Icon>');
         buffer.writeln('  </IconStyle>');
+        buffer.writeln('  <LabelStyle>');
+        buffer.writeln(
+          '    <color>${rule.labelColor ?? defaultLabelColor}</color>',
+        ); // FIXED
+        buffer.writeln(
+          '    <scale>${rule.labelScale ?? defaultLabelScale}</scale>',
+        ); // FIXED
+        buffer.writeln('  </LabelStyle>');
         buffer.writeln('</Style>');
       }
     }
@@ -720,5 +820,67 @@ class KmlGenerationService implements IKmlGenerationService {
     // Create unique filename to avoid conflicts
     final fileName = '${baseName}_converted_$timestamp$extension';
     return path.join(downloadsPath, fileName);
+  }
+
+  /// Generate description content with table support
+  String _generateDescription(
+    Map<String, dynamic> row,
+    ColumnMapping columnMapping,
+    KmlGenerationOptions options,
+  ) {
+    if (!options.includeDescription) return '';
+
+    if (options.useDescriptionTable &&
+        options.descriptionColumns != null &&
+        options.descriptionColumns!.isNotEmpty) {
+      return _generateTableDescription(row, options);
+    } else if (columnMapping.descriptionColumn != null) {
+      return row[columnMapping.descriptionColumn]?.toString() ?? '';
+    }
+
+    return '';
+  }
+
+  /// Generate table-formatted description
+  String _generateTableDescription(
+    Map<String, dynamic> row,
+    KmlGenerationOptions options,
+  ) {
+    final style = _getTableStyle(options.descriptionTableStyle ?? 'simple');
+    final buffer = StringBuffer();
+
+    buffer.writeln('<div style="$style">');
+    buffer.writeln('<table style="width:100%; border-collapse: collapse;">');
+
+    for (final column in options.descriptionColumns!) {
+      final value = row[column]?.toString() ?? '';
+      if (value.isNotEmpty) {
+        buffer.writeln('<tr>');
+        buffer.writeln(
+          '<td style="font-weight: bold; padding: 4px; vertical-align: top;">$column:</td>',
+        );
+        buffer.writeln('<td style="padding: 4px;">$value</td>');
+        buffer.writeln('</tr>');
+      }
+    }
+
+    buffer.writeln('</table>');
+    buffer.writeln('</div>');
+
+    return buffer.toString();
+  }
+
+  /// Get CSS styling for description tables
+  String _getTableStyle(String styleType) {
+    switch (styleType) {
+      case 'bordered':
+        return 'font-family: Arial, sans-serif; font-size: 12px; table { border: 1px solid #ddd; } td { border: 1px solid #ddd; }';
+      case 'striped':
+        return 'font-family: Arial, sans-serif; font-size: 12px; tr:nth-child(even) { background-color: #f2f2f2; }';
+      case 'condensed':
+        return 'font-family: Arial, sans-serif; font-size: 11px; td { padding: 2px; }';
+      default: // simple
+        return 'font-family: Arial, sans-serif; font-size: 12px;';
+    }
   }
 }

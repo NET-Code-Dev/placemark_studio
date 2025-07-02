@@ -7,9 +7,9 @@ import '../../../core/enums/export_format.dart';
 import '../../../core/enums/geometry_type.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/column_mapping.dart';
-import '../../../data/models/styling_compatibility.dart';
+//import '../../../data/models/styling_compatibility.dart';
 import 'widgets/styling_integration.dart'; // Updated import
-import 'widgets/export_options_step.dart';
+//import 'widgets/export_options_step.dart';
 
 class CsvConverterView extends StatelessWidget {
   const CsvConverterView({super.key});

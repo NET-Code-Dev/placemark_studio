@@ -100,11 +100,14 @@ class KmlColor {
 /// Style configuration for different geometry types
 class GeometryStyle {
   final KmlColor color;
-  final KmlIcon? icon; // Only for points
-  final double lineWidth; // For lines and polygon borders
-  final double opacity; // 0.0 to 1.0
-  final bool filled; // For polygons
-  final bool outlined; // For polygons
+  final KmlIcon? icon;
+  final double lineWidth;
+  final double opacity;
+  final bool filled;
+  final bool outlined;
+  final double scale;
+  final KmlColor labelColor;
+  final double labelScale;
 
   const GeometryStyle({
     required this.color,
@@ -113,32 +116,66 @@ class GeometryStyle {
     this.opacity = 1.0,
     this.filled = true,
     this.outlined = true,
+    this.scale = 1.0,
+    this.labelColor = const KmlColor('White', Color(0xFFFFFFFF), 'ffffffff'),
+    this.labelScale = 0.9,
   });
 
-  /// Create style for point geometry
+  /// Create style for point geometry with Google Earth defaults
   factory GeometryStyle.point({
-    KmlColor color = const KmlColor('Red', Color(0xFFFF0000), 'ff0000ff'),
+    KmlColor color = const KmlColor('Yellow', Color(0xFFFFFF00), 'ff00ffff'),
     KmlIcon icon = KmlIcon.pushpin,
+    double scale = 1.2, // Google Earth default scale
+    KmlColor labelColor = const KmlColor(
+      'White',
+      Color(0xFFFFFFFF),
+      'ffffffff',
+    ), // Google Earth default
+    double labelScale = 0.9, // Google Earth default
   }) {
-    return GeometryStyle(color: color, icon: icon);
+    return GeometryStyle(
+      color: color,
+      icon: icon,
+      scale: scale,
+      labelColor: labelColor,
+      labelScale: labelScale,
+    );
   }
 
-  /// Create style for line geometry
+  /// Create style for line geometry with Google Earth defaults
   factory GeometryStyle.line({
     KmlColor color = const KmlColor('Blue', Color(0xFF0000FF), 'ffff0000'),
     double lineWidth = 3.0,
     double opacity = 1.0,
+    KmlColor labelColor = const KmlColor(
+      'White',
+      Color(0xFFFFFFFF),
+      'ffffffff',
+    ),
+    double labelScale = 0.9,
   }) {
-    return GeometryStyle(color: color, lineWidth: lineWidth, opacity: opacity);
+    return GeometryStyle(
+      color: color,
+      lineWidth: lineWidth,
+      opacity: opacity,
+      labelColor: labelColor,
+      labelScale: labelScale,
+    );
   }
 
-  /// Create style for polygon geometry
+  /// Create style for polygon geometry with Google Earth defaults
   factory GeometryStyle.polygon({
     KmlColor color = const KmlColor('Green', Color(0xFF00FF00), 'ff00ff00'),
     double lineWidth = 2.0,
     double opacity = 0.5,
     bool filled = true,
     bool outlined = true,
+    KmlColor labelColor = const KmlColor(
+      'White',
+      Color(0xFFFFFFFF),
+      'ffffffff',
+    ),
+    double labelScale = 0.9,
   }) {
     return GeometryStyle(
       color: color,
@@ -146,7 +183,40 @@ class GeometryStyle {
       opacity: opacity,
       filled: filled,
       outlined: outlined,
+      labelColor: labelColor,
+      labelScale: labelScale,
     );
+  }
+
+  /// Create Google Earth-style defaults
+  factory GeometryStyle.googleEarthDefaults(GeometryType geometryType) {
+    switch (geometryType) {
+      case GeometryType.point:
+        return GeometryStyle.point(
+          color: const KmlColor('Yellow', Color(0xFFFFFF00), 'ff00ffff'),
+          icon: KmlIcon.pushpin,
+          scale: 1.2,
+          labelColor: const KmlColor('White', Color(0xFFFFFFFF), 'ffffffff'),
+          labelScale: 0.9,
+        );
+      case GeometryType.lineString:
+        return GeometryStyle.line(
+          color: const KmlColor('Blue', Color(0xFF0000FF), 'ffff0000'),
+          lineWidth: 3.0,
+          labelColor: const KmlColor('White', Color(0xFFFFFFFF), 'ffffffff'),
+          labelScale: 0.9,
+        );
+      case GeometryType.polygon:
+        return GeometryStyle.polygon(
+          color: const KmlColor('Green', Color(0xFF00FF00), 'ff00ff00'),
+          lineWidth: 2.0,
+          opacity: 0.5,
+          labelColor: const KmlColor('White', Color(0xFFFFFFFF), 'ffffffff'),
+          labelScale: 0.9,
+        );
+      default:
+        return GeometryStyle.point();
+    }
   }
 
   GeometryStyle copyWith({
@@ -156,6 +226,9 @@ class GeometryStyle {
     double? opacity,
     bool? filled,
     bool? outlined,
+    double? scale,
+    KmlColor? labelColor,
+    double? labelScale,
   }) {
     return GeometryStyle(
       color: color ?? this.color,
@@ -164,6 +237,9 @@ class GeometryStyle {
       opacity: opacity ?? this.opacity,
       filled: filled ?? this.filled,
       outlined: outlined ?? this.outlined,
+      scale: scale ?? this.scale,
+      labelColor: labelColor ?? this.labelColor,
+      labelScale: labelScale ?? this.labelScale,
     );
   }
 }
@@ -182,18 +258,18 @@ class StylingOptions {
     this.stylingColumn,
   });
 
-  /// Factory for default styling based on geometry type
+  /// Factory for default styling based on geometry type with Google Earth defaults
   factory StylingOptions.forGeometry(GeometryType geometryType) {
-    switch (geometryType) {
-      case GeometryType.point:
-        return StylingOptions(defaultStyle: GeometryStyle.point());
-      case GeometryType.lineString:
-        return StylingOptions(defaultStyle: GeometryStyle.line());
-      case GeometryType.polygon:
-        return StylingOptions(defaultStyle: GeometryStyle.polygon());
-      default:
-        return StylingOptions(defaultStyle: GeometryStyle.point());
-    }
+    return StylingOptions(
+      defaultStyle: GeometryStyle.googleEarthDefaults(geometryType),
+    );
+  }
+
+  /// Factory for creating with explicit Google Earth defaults
+  factory StylingOptions.withGoogleEarthDefaults(GeometryType geometryType) {
+    return StylingOptions(
+      defaultStyle: GeometryStyle.googleEarthDefaults(geometryType),
+    );
   }
 
   /// Get style for a specific column value

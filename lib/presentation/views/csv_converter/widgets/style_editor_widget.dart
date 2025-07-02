@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/enums/geometry_type.dart';
 import '../../../../data/models/styling_options.dart';
@@ -27,15 +28,26 @@ class _StyleEditorWidgetState extends State<StyleEditorWidget> {
   @override
   void initState() {
     super.initState();
+    // Start with the provided initial style (which should be Google Earth defaults)
     _currentStyle = widget.initialStyle;
-    _showAdvancedOptions = widget.showAdvanced;
+
+    if (kDebugMode) {
+      print('StyleEditor initialized with:');
+      print('  Color: ${_currentStyle.color.name}');
+      print('  Icon: ${_currentStyle.icon?.displayName}');
+      print('  Scale: ${_currentStyle.scale}');
+      print('  Label Color: ${_currentStyle.labelColor.name}');
+      print('  Label Scale: ${_currentStyle.labelScale}');
+    }
   }
 
   @override
   void didUpdateWidget(StyleEditorWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.initialStyle != widget.initialStyle) {
-      _currentStyle = widget.initialStyle;
+      setState(() {
+        _currentStyle = widget.initialStyle;
+      });
     }
   }
 
@@ -53,7 +65,15 @@ class _StyleEditorWidgetState extends State<StyleEditorWidget> {
         if (widget.geometryType == GeometryType.point) ...[
           _buildIconSelection(),
           const SizedBox(height: 16),
+
+          // NEW: Scale selection
+          _buildScaleSelection(),
+          const SizedBox(height: 16),
         ],
+
+        // NEW: Label styling
+        _buildLabelStyling(),
+        const SizedBox(height: 16),
 
         // Line width (for lines and polygons)
         if (widget.geometryType == GeometryType.lineString ||
@@ -85,6 +105,129 @@ class _StyleEditorWidgetState extends State<StyleEditorWidget> {
     );
   }
 
+  Widget _buildScaleSelection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Icon Size',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const Spacer(),
+            Text(
+              '${(_currentStyle.scale * 100).toInt()}%',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            trackHeight: 4,
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+          ),
+          child: Slider(
+            value: _currentStyle.scale,
+            min: 0.5,
+            max: 3.0,
+            divisions: 25,
+            onChanged: _updateScale,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// NEW: Label styling controls
+  Widget _buildLabelStyling() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Label Style',
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 12),
+
+        // Label Color
+        Row(
+          children: [
+            Text('Color:', style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(width: 8),
+            SizedBox(
+              height: 30,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                shrinkWrap: true,
+                itemCount: KmlColor.predefinedColors.length,
+                itemBuilder: (context, index) {
+                  final color = KmlColor.predefinedColors[index];
+                  final isSelected = _currentStyle.labelColor == color;
+
+                  return GestureDetector(
+                    onTap: () => _updateLabelColor(color),
+                    child: Container(
+                      width: 30,
+                      height: 30,
+                      margin: const EdgeInsets.only(right: 4),
+                      decoration: BoxDecoration(
+                        color: color.color,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: isSelected ? Colors.black : Colors.grey[300]!,
+                          width: isSelected ? 2 : 1,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 12),
+
+        // Label Scale
+        Row(
+          children: [
+            Text(
+              'Size: ${(_currentStyle.labelScale * 100).toInt()}%',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  trackHeight: 3,
+                  thumbShape: const RoundSliderThumbShape(
+                    enabledThumbRadius: 6,
+                  ),
+                ),
+                child: Slider(
+                  value: _currentStyle.labelScale,
+                  min: 0.5,
+                  max: 2.0,
+                  divisions: 15,
+                  onChanged: _updateLabelScale,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildColorSelection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -96,7 +239,7 @@ class _StyleEditorWidgetState extends State<StyleEditorWidget> {
           ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
-        Container(
+        SizedBox(
           height: 50,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
@@ -122,7 +265,7 @@ class _StyleEditorWidgetState extends State<StyleEditorWidget> {
                         isSelected
                             ? [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
+                                color: Colors.black.withValues(alpha: 0.2),
                                 blurRadius: 4,
                                 offset: const Offset(0, 2),
                               ),
@@ -164,7 +307,7 @@ class _StyleEditorWidgetState extends State<StyleEditorWidget> {
           ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
-        Container(
+        SizedBox(
           height: 60,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
@@ -384,10 +527,11 @@ class _StyleEditorWidgetState extends State<StyleEditorWidget> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: _currentStyle.color.color.withOpacity(
-                    widget.geometryType == GeometryType.polygon
-                        ? _currentStyle.opacity
-                        : 1.0,
+                  color: _currentStyle.color.color.withValues(
+                    alpha:
+                        widget.geometryType == GeometryType.polygon
+                            ? _currentStyle.opacity
+                            : 1.0,
                   ),
                   border: Border.all(
                     color:
@@ -486,11 +630,48 @@ class _StyleEditorWidgetState extends State<StyleEditorWidget> {
   }
 
   // Event handlers
+  void _updateScale(double scale) {
+    setState(() {
+      _currentStyle = _currentStyle.copyWith(scale: scale);
+    });
+    widget.onStyleChanged(_currentStyle);
+
+    if (kDebugMode) {
+      print('User changed scale to: ${scale}x');
+    }
+  }
+
+  void _updateLabelColor(KmlColor color) {
+    setState(() {
+      _currentStyle = _currentStyle.copyWith(labelColor: color);
+    });
+    widget.onStyleChanged(_currentStyle);
+
+    if (kDebugMode) {
+      print('User changed label color to: ${color.name}');
+    }
+  }
+
+  void _updateLabelScale(double scale) {
+    setState(() {
+      _currentStyle = _currentStyle.copyWith(labelScale: scale);
+    });
+    widget.onStyleChanged(_currentStyle);
+
+    if (kDebugMode) {
+      print('User changed label scale to: ${scale}x');
+    }
+  }
+
   void _updateColor(KmlColor color) {
     setState(() {
       _currentStyle = _currentStyle.copyWith(color: color);
     });
     widget.onStyleChanged(_currentStyle);
+
+    if (kDebugMode) {
+      print('User changed color to: ${color.name}');
+    }
   }
 
   void _updateIcon(KmlIcon icon) {
@@ -498,6 +679,10 @@ class _StyleEditorWidgetState extends State<StyleEditorWidget> {
       _currentStyle = _currentStyle.copyWith(icon: icon);
     });
     widget.onStyleChanged(_currentStyle);
+
+    if (kDebugMode) {
+      print('User changed icon to: ${icon.displayName}');
+    }
   }
 
   void _updateLineWidth(double width) {

@@ -1,16 +1,39 @@
 import '../../core/enums/geometry_type.dart';
 
+class DefaultStyleConfig {
+  final String? color; // KML color format (AABBGGRR)
+  final String? iconUrl; // Icon URL
+  final double? scale; // Icon scale (0.0 - 3.0)
+  final String? labelColor; // Label color
+  final double? labelScale; // Label scale
+
+  const DefaultStyleConfig({
+    this.color,
+    this.iconUrl,
+    this.scale,
+    this.labelColor,
+    this.labelScale,
+  });
+}
+
+/// Enhanced StyleRule with additional properties
 class StyleRule {
   final String columnName;
   final String columnValue;
   final String color;
   final String iconUrl;
+  final double? scale; // NEW: Icon scale
+  final String? labelColor; // NEW: Label color
+  final double? labelScale; // NEW: Label scale
 
-  const StyleRule({
+  StyleRule({
     required this.columnName,
     required this.columnValue,
     required this.color,
     required this.iconUrl,
+    this.scale,
+    this.labelColor,
+    this.labelScale,
   });
 
   StyleRule copyWith({
@@ -18,18 +41,24 @@ class StyleRule {
     String? columnValue,
     String? color,
     String? iconUrl,
+    double? scale,
+    String? labelColor, // NEW
+    double? labelScale, // NEW
   }) {
     return StyleRule(
       columnName: columnName ?? this.columnName,
       columnValue: columnValue ?? this.columnValue,
       color: color ?? this.color,
       iconUrl: iconUrl ?? this.iconUrl,
+      scale: scale ?? this.scale,
+      labelColor: labelColor ?? this.labelColor, // NEW
+      labelScale: labelScale ?? this.labelScale, // NEW
     );
   }
 
   @override
   String toString() {
-    return 'StyleRule(column: $columnName, value: $columnValue, color: $color)';
+    return 'StyleRule(column: $columnName, value: $columnValue, color: $color, labelColor: $labelColor)';
   }
 }
 
@@ -42,6 +71,10 @@ class KmlGenerationOptions {
   final bool useCustomIcons;
   final Map<String, StyleRule> styleRules;
   final String? outputPath;
+  final DefaultStyleConfig? defaultStyle; // NEW: Default style config
+  final List<String>? descriptionColumns; // NEW: Columns for description table
+  final bool useDescriptionTable; // NEW: Use table format for descriptions
+  final String? descriptionTableStyle;
 
   const KmlGenerationOptions({
     this.documentName = 'Converted from CSV',
@@ -52,6 +85,10 @@ class KmlGenerationOptions {
     this.useCustomIcons = false,
     this.styleRules = const {},
     this.outputPath,
+    this.defaultStyle,
+    this.descriptionColumns,
+    this.useDescriptionTable = false,
+    this.descriptionTableStyle,
   });
 
   /// Factory for default options
