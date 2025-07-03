@@ -46,6 +46,9 @@ class EnhancedKmlGenerationService implements IEnhancedKmlGenerationService {
     required GeometryType geometryType,
     bool includeElevation = true,
     bool includeDescription = true,
+    List<File>? imageFiles,
+    String? imageColumnName,
+    Map<String, File>? imageAssociations,
   }) async {
     try {
       if (!csvData.hasValidCoordinates) {

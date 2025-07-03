@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart';
 import 'package:provider/provider.dart';
 import '../../viewmodels/csv_converter_viewmodel.dart';
 import '../../../core/enums/conversion_step.dart';
@@ -9,6 +10,7 @@ import '../../../core/di/service_locator.dart';
 import '../../../data/models/column_mapping.dart';
 //import '../../../data/models/styling_compatibility.dart';
 import 'widgets/description_options.dart';
+import 'widgets/image_integration_panel.dart';
 import 'widgets/styling_integration.dart'; // Updated import
 //import 'widgets/export_options_step.dart';
 
@@ -736,10 +738,69 @@ class _CsvConverterContent extends StatelessWidget {
     CsvConverterViewModel viewModel,
   ) {
     return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Step description
+          // Export Format Selection
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Export Format',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SegmentedButton<ExportFormat>(
+                    segments:
+                        ExportFormat.values.map((format) {
+                          return ButtonSegment<ExportFormat>(
+                            value: format,
+                            label: Text(format.displayName),
+                            icon: Icon(format.icon),
+                          );
+                        }).toList(),
+                    selected: {viewModel.selectedExportFormat},
+                    onSelectionChanged: (Set<ExportFormat> selection) {
+                      viewModel.setExportFormat(selection.first);
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    viewModel.selectedExportFormat == ExportFormat.kmz
+                        ? 'KMZ format includes embedded images and is recommended for sharing'
+                        : 'KML format is plain text and smaller but requires separate image files',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Image Integration Panel
+          ImageIntegrationPanel(
+            availableColumns: viewModel.csvData?.headers ?? [],
+            selectedImageColumn: viewModel.selectedImageColumn,
+            onImageColumnChanged: viewModel.setImageColumn,
+            detectedImages: viewModel.detectedImages,
+            imageAssociations: viewModel.imageAssociations,
+            imageStatistics: viewModel.imageStatistics,
+            isLoading: viewModel.isImageScanLoading,
+            onRefreshImages: viewModel.refreshImageDetection,
+          ),
+
+          const SizedBox(height: 16),
+
+          // Export Options
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -748,15 +809,125 @@ class _CsvConverterContent extends StatelessWidget {
                 children: [
                   Text(
                     'Export Options',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Configure output format and location for your converted file.',
-                    style: Theme.of(context).textTheme.bodyMedium,
+                  const SizedBox(height: 12),
+
+                  CheckboxListTile(
+                    title: const Text('Include elevation data'),
+                    subtitle: const Text(
+                      'Add elevation/altitude information to placemarks',
+                    ),
+                    value: viewModel.generationOptions.includeElevation,
+                    onChanged: (value) {
+                      viewModel.updateGenerationOptions(
+                        viewModel.generationOptions.copyWith(
+                          includeElevation: value ?? false,
+                        ),
+                      );
+                    },
+                    contentPadding: EdgeInsets.zero,
                   ),
+
+                  CheckboxListTile(
+                    title: const Text('Include detailed descriptions'),
+                    subtitle: const Text(
+                      'Add all CSV data as placemark descriptions',
+                    ),
+                    value: viewModel.generationOptions.includeDescription,
+                    onChanged: (value) {
+                      viewModel.updateGenerationOptions(
+                        viewModel.generationOptions.copyWith(
+                          includeDescription: value ?? false,
+                        ),
+                      );
+                    },
+                    contentPadding: EdgeInsets.zero,
+                  ),
+
+                  if (viewModel.hasImageIntegration)
+                    CheckboxListTile(
+                      title: const Text('Optimize images for KMZ'),
+                      subtitle: const Text(
+                        'Reduce image file sizes for smaller KMZ files',
+                      ),
+                      value: false, // This would be a new option
+                      onChanged: (value) {
+                        // TODO: Implement image optimization option
+                      },
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Export Summary
+          Card(
+            color: Colors.blue[50],
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.blue[700]),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Export Summary',
+                        style: Theme.of(
+                          context,
+                        ).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue[700],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _buildSummaryRow(
+                    'Format',
+                    viewModel.selectedExportFormat.displayName.toUpperCase(),
+                  ),
+                  _buildSummaryRow(
+                    'Geometry',
+                    viewModel.selectedGeometryType.displayName,
+                  ),
+                  _buildSummaryRow(
+                    'Features',
+                    '${viewModel.csvData?.validRowCount ?? 0} valid locations',
+                  ),
+                  if (viewModel.hasImageIntegration) ...[
+                    _buildSummaryRow(
+                      'Images',
+                      viewModel.imageStatistics != null
+                          ? '${viewModel.imageStatistics!['successfulMatches']} embedded'
+                          : 'Processing...',
+                    ),
+                    if (viewModel.imageStatistics != null &&
+                        viewModel.imageStatistics!['missingImages'] > 0)
+                      _buildSummaryRow(
+                        'Missing Images',
+                        '${viewModel.imageStatistics!['missingImages']} not found',
+                        isWarning: true,
+                      ),
+                  ],
+                  if (viewModel.generationOptions.includeElevation)
+                    _buildSummaryRow('Elevation', 'Included'),
+                  if (viewModel.generationOptions.includeDescription)
+                    _buildSummaryRow('Descriptions', 'Full CSV data'),
+                  if (viewModel.useEnhancedStyling &&
+                      viewModel.enhancedStylingOptions?.rules.isNotEmpty ==
+                          true)
+                    _buildSummaryRow(
+                      'Styling',
+                      '${viewModel.enhancedStylingOptions!.rules.length} custom rules',
+                    ),
                 ],
               ),
             ),
@@ -764,25 +935,153 @@ class _CsvConverterContent extends StatelessWidget {
 
           const SizedBox(height: 24),
 
-          // Export format selection
-          _buildFormatSelector(context, viewModel),
+          // Export Button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed:
+                  viewModel.canExport ? () => _performExport(viewModel) : null,
+              icon: Icon(viewModel.selectedExportFormat.icon),
+              label: Text(
+                'Export to ${viewModel.selectedExportFormat.displayName.toUpperCase()}',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                backgroundColor:
+                    viewModel.hasImageIntegration ? Colors.green[600] : null,
+              ),
+            ),
+          ),
 
-          const SizedBox(height: 24),
+          if (!viewModel.canExport)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Please ensure all required data is valid before exporting.',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: Colors.red[600]),
+                textAlign: TextAlign.center,
+              ),
+            ),
 
-          // Output path selection
-          _buildOutputPathSelector(context, viewModel),
+          const SizedBox(height: 16),
 
-          const SizedBox(height: 24),
-
-          // Export summary
-          _buildExportSummary(context, viewModel),
+          // Navigation buttons
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed:
+                      () => viewModel.proceedToStep(
+                        ConversionStep.geometryAndStyling,
+                      ),
+                  child: const Text('Back to Styling'),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextButton(
+                  onPressed: () => viewModel.resetConverter(),
+                  child: const Text('Start Over'),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  // Add these helper methods to your csv_converter_view.dart:
+  Widget _buildSummaryRow(
+    String label,
+    String value, {
+    bool isWarning = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              '$label:',
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: isWarning ? Colors.orange[700] : null,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                color: isWarning ? Colors.orange[700] : Colors.grey[700],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
+  Future<void> _performExport(CsvConverterViewModel viewModel) async {
+    // Show confirmation dialog if there are missing images
+    if (viewModel.hasImageIntegration &&
+        viewModel.imageStatistics != null &&
+        viewModel.imageStatistics!['missingImages'] > 0) {
+      final shouldProceed = await _showMissingImagesDialog(
+        context,
+        viewModel.imageStatistics!['missingImages'] as int,
+      );
+
+      if (!shouldProceed) return;
+    }
+
+    // Perform the export
+    if (viewModel.selectedExportFormat == ExportFormat.kmz) {
+      await viewModel.exportToKmzWithImages();
+    } else {
+      await viewModel.exportToKml();
+    }
+  }
+
+  Future<bool> _showMissingImagesDialog(
+    BuildContext context,
+    int missingCount,
+  ) async {
+    return await showDialog<bool>(
+          context: context,
+          builder:
+              (context) => AlertDialog(
+                title: const Text('Missing Images'),
+                content: Text(
+                  '$missingCount images referenced in your CSV were not found. '
+                  'The export will continue without these images.\n\n'
+                  'Do you want to proceed?',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: const Text('Proceed'),
+                  ),
+                ],
+              ),
+        ) ??
+        false;
+  }
+
+  /*
+  // Add these helper methods to your csv_converter_view.dart:
   Widget _buildFormatSelector(
     BuildContext context,
     CsvConverterViewModel viewModel,
@@ -1111,7 +1410,7 @@ class _CsvConverterContent extends StatelessWidget {
       }
     }
   }
-
+*/
   Widget _buildExportCompleteStep(
     BuildContext context,
     CsvConverterViewModel viewModel,
@@ -1315,6 +1614,7 @@ class _CsvConverterContent extends StatelessWidget {
     }
   }
 
+  /*
   void _performExport(CsvConverterViewModel viewModel) {
     switch (viewModel.selectedExportFormat) {
       case ExportFormat.kml:
@@ -1351,4 +1651,5 @@ class _CsvConverterContent extends StatelessWidget {
         break;
     }
   }
+  */
 }

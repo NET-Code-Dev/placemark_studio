@@ -14,6 +14,7 @@ import '../../../core/errors/app_exception.dart';
 import '../../../core/enums/geometry_type.dart';
 import '../../../core/enums/export_format.dart';
 import '../../../core/enums/conversion_step.dart';
+import '../../data/services/image_detection_service.dart';
 import 'base_viewmodel.dart';
 
 class CsvConverterViewModel extends BaseViewModel {
@@ -39,6 +40,12 @@ class CsvConverterViewModel extends BaseViewModel {
   List<String> _selectedDescriptionColumns = [];
   bool _useDescriptionTable = false;
   String _descriptionTableStyle = 'simple';
+  // Image integration properties
+  String? _selectedImageColumn;
+  List<File>? _detectedImages;
+  Map<String, File>? _imageAssociations;
+  Map<String, dynamic>? _imageStatistics;
+  bool _isImageScanLoading = false;
 
   // Configuration
   GeometryType _selectedGeometryType = GeometryType.point;
@@ -83,6 +90,14 @@ class CsvConverterViewModel extends BaseViewModel {
         existingOptions: _stylingOptions,
       );
   bool get useEnhancedStyling => _useEnhancedStyling;
+
+  // Image integration getters
+  String? get selectedImageColumn => _selectedImageColumn;
+  List<File>? get detectedImages => _detectedImages;
+  Map<String, File>? get imageAssociations => _imageAssociations;
+  Map<String, dynamic>? get imageStatistics => _imageStatistics;
+  bool get isImageScanLoading => _isImageScanLoading;
+  bool get hasImageIntegration => _selectedImageColumn != null;
 
   // Output path getters
   String? get customOutputPath => _customOutputPath;
@@ -195,6 +210,111 @@ class CsvConverterViewModel extends BaseViewModel {
       _columnMapping = null;
       rethrow;
     }
+  }
+
+  Future<void> setImageColumn(String? columnName) async {
+    if (_selectedImageColumn == columnName) return;
+
+    _selectedImageColumn = columnName;
+    _imageAssociations = null;
+    _imageStatistics = null;
+
+    if (columnName != null && _selectedFile != null) {
+      await _detectAndAssociateImages();
+    } else {
+      _detectedImages = null;
+      _imageAssociations = null;
+      _imageStatistics = null;
+    }
+
+    notifyListeners();
+  }
+
+  /// Detect images in the CSV folder and associate them with data
+  Future<void> _detectAndAssociateImages() async {
+    if (_selectedFile == null ||
+        _selectedImageColumn == null ||
+        _csvData == null) {
+      return;
+    }
+
+    try {
+      _isImageScanLoading = true;
+      notifyListeners();
+
+      // Import the ImageService
+      // Detect images in the CSV folder
+      _detectedImages = await ImageService.detectImageFiles(
+        _selectedFile!.path,
+      );
+
+      if (_detectedImages != null && _detectedImages!.isNotEmpty) {
+        // Get image column values from CSV data
+        final imageColumnValues = _getImageColumnValues();
+
+        // Associate images with CSV data
+        _imageAssociations = ImageService.associateImagesWithData(
+          imageFiles: _detectedImages!,
+          imageColumnValues: imageColumnValues,
+        );
+
+        // Generate statistics
+        _imageStatistics = ImageService.getImageStatistics(
+          imageColumnValues: imageColumnValues,
+          availableImages: _detectedImages!,
+          associations: _imageAssociations!,
+        );
+
+        if (kDebugMode) {
+          print('Image detection completed:');
+          print('  Detected images: ${_detectedImages!.length}');
+          print('  Associations: ${_imageAssociations!.length}');
+          print('  Statistics: $_imageStatistics');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error detecting images: $e');
+      }
+      // Don't throw error, just log it - image integration is optional
+    } finally {
+      _isImageScanLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Get values from the selected image column
+  List<String> _getImageColumnValues() {
+    if (_csvData == null || _selectedImageColumn == null) {
+      return [];
+    }
+
+    final columnIndex = _csvData!.headers.indexOf(_selectedImageColumn!);
+    if (columnIndex == -1) {
+      return [];
+    }
+
+    return _csvData!.rows
+        .map((row) => row.length > columnIndex ? row[columnIndex] : '')
+        .toList();
+  }
+
+  /// Refresh image detection manually
+  Future<void> refreshImageDetection() async {
+    if (_selectedImageColumn != null) {
+      await _detectAndAssociateImages();
+    }
+  }
+
+  /// Get list of referenced image files for KMZ export
+  List<File>? getReferencedImageFiles() {
+    if (_imageAssociations == null || _imageAssociations!.isEmpty) {
+      return null;
+    }
+
+    return ImageService.getReferencedImageFiles(
+      imageAssociations: _imageAssociations!,
+    );
   }
 
   /// Auto-detect column mappings based on common naming patterns
@@ -758,7 +878,122 @@ class CsvConverterViewModel extends BaseViewModel {
     }
   }
 
+  Future<void> exportToKmzWithImages() async {
+    if (_csvData == null || _columnMapping == null) {
+      setError('No data available for export');
+      return;
+    }
+
+    try {
+      setLoading();
+
+      // Get image files for export if image integration is enabled
+      List<File>? imageFiles;
+      if (hasImageIntegration) {
+        imageFiles = getReferencedImageFiles();
+
+        if (kDebugMode) {
+          print('Exporting KMZ with image integration:');
+          print('  Image column: $_selectedImageColumn');
+          print('  Image files to include: ${imageFiles?.length ?? 0}');
+          if (imageFiles != null) {
+            for (final file in imageFiles) {
+              print('    - ${path.basename(file.path)}');
+            }
+          }
+        }
+      }
+
+      // Generate appropriate document name
+      final baseName =
+          _selectedFile != null
+              ? path.basenameWithoutExtension(_selectedFile!.path)
+              : 'converted_data';
+
+      final timestamp = DateTime.now().toIso8601String().split('T')[0];
+      final documentName = '$baseName - Converted ${DateTime.now().year}';
+      final documentDescription =
+          hasImageIntegration
+              ? 'Converted from CSV on $timestamp with ${imageFiles?.length ?? 0} embedded images'
+              : 'Converted from CSV on $timestamp';
+
+      // Update generation options for image-enabled KMZ
+      final exportOptions = _generationOptions.copyWith(
+        geometryType: _selectedGeometryType,
+        documentName: documentName,
+        documentDescription: documentDescription,
+        useCustomIcons: true,
+        includeDescription:
+            _generationOptions.includeDescription || hasImageIntegration,
+      );
+
+      // Enhanced KML generation with image references
+      late File outputFile;
+
+      if (_useEnhancedStyling &&
+          _enhancedStylingOptions != null &&
+          _enhancedStylingOptions!.useRuleBasedStyling &&
+          _enhancedStylingOptions!.rules.isNotEmpty) {
+        // Use enhanced service for rule-based styling with images
+        outputFile = await _enhancedKmlGenerationService.generateKmzWithRules(
+          csvData: _csvData!,
+          columnMapping: _columnMapping!,
+          stylingOptions: _enhancedStylingOptions!,
+          documentName: documentName,
+          documentDescription: documentDescription,
+          geometryType: _selectedGeometryType,
+          imageFiles: imageFiles,
+          includeElevation: exportOptions.includeElevation,
+          includeDescription: exportOptions.includeDescription,
+          imageColumnName: _selectedImageColumn, // Pass image column info
+        );
+      } else {
+        // Use legacy service with image support
+        outputFile = await _kmlGenerationService.generateKmz(
+          csvData: _csvData!,
+          columnMapping: _columnMapping!,
+          options: exportOptions,
+          imageFiles: imageFiles,
+        );
+      }
+
+      _outputPath = outputFile.path;
+
+      // Generate success message with image info
+      final validRowCount = _csvData!.validRowCount;
+      final imageCount = imageFiles?.length ?? 0;
+
+      if (imageCount > 0) {
+        _successMessage =
+            'Successfully exported $validRowCount features and $imageCount images to KMZ format';
+      } else {
+        _successMessage =
+            'Successfully exported $validRowCount features to KMZ format';
+      }
+
+      if (kDebugMode) {
+        print('KMZ export completed: $_outputPath');
+        print('Features exported: $validRowCount');
+        print('Images included: $imageCount');
+        if (_imageStatistics != null) {
+          print('Image statistics: $_imageStatistics');
+        }
+      }
+
+      setLoading();
+      notifyListeners();
+    } catch (e) {
+      setLoading();
+      setError('Export failed: ${e.toString()}');
+      if (kDebugMode) {
+        print('KMZ export error: $e');
+      }
+    }
+  }
+
   Future<void> exportToKmz({List<File>? imageFiles}) async {
+    await exportToKmzWithImages();
+
     if (!canExport) {
       setError('Cannot export: Data validation failed');
       return;
@@ -938,6 +1173,13 @@ class CsvConverterViewModel extends BaseViewModel {
     _useEnhancedStyling = false;
     _previewColumnValues = null;
 
+    // Reset image integration state
+    _selectedImageColumn = null;
+    _detectedImages = null;
+    _imageAssociations = null;
+    _imageStatistics = null;
+    _isImageScanLoading = false;
+
     clearError();
     notifyListeners();
   }
@@ -959,6 +1201,43 @@ class CsvConverterViewModel extends BaseViewModel {
       if (kDebugMode) {
         print('Failed to open output folder: $e');
       }
+    }
+  }
+
+  /// Auto-detect image column when CSV is loaded
+  void _autoDetectImageColumn() {
+    if (_csvData == null) return;
+
+    // Look for columns that might contain image filenames
+    final imageColumnCandidates =
+        _csvData!.headers.where((header) {
+          final lowerHeader = header.toLowerCase();
+          return lowerHeader.contains('image') ||
+              lowerHeader.contains('photo') ||
+              lowerHeader.contains('picture') ||
+              lowerHeader.contains('img') ||
+              lowerHeader.contains('file') ||
+              lowerHeader.contains('pic');
+        }).toList();
+
+    if (imageColumnCandidates.isNotEmpty) {
+      // Auto-select the first candidate and trigger detection
+      setImageColumn(imageColumnCandidates.first);
+
+      if (kDebugMode) {
+        print('Auto-detected image column: ${imageColumnCandidates.first}');
+      }
+    }
+  }
+
+  /// Override the existing CSV processing to include auto-detection
+  @override
+  Future<void> processSelectedFile() async {
+    await super.processSelectedFile();
+
+    // After CSV is processed, try to auto-detect image column
+    if (_csvData != null && !hasError) {
+      _autoDetectImageColumn();
     }
   }
 }
