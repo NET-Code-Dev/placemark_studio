@@ -1,3 +1,5 @@
+
+/*
 import 'dart:io';
 import 'dart:convert';
 import 'package:archive/archive.dart';
@@ -161,6 +163,15 @@ class KmzImageService {
           (processed, _) => processedCount = processed,
         );
         break;
+      case GeometryType.linearRing:
+        // TODO: Handle this case.
+        throw UnimplementedError();
+      case GeometryType.multiGeometry:
+        // TODO: Handle this case.
+        throw UnimplementedError();
+      case GeometryType.model:
+        // TODO: Handle this case.
+        throw UnimplementedError();
     }
 
     // KML footer
@@ -593,3 +604,4 @@ class KmzImageService {
     return 'output.kmz'; // Placeholder
   }
 }
+*/

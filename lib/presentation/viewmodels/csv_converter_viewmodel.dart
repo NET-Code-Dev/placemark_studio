@@ -25,7 +25,8 @@ class CsvConverterViewModel extends BaseViewModel {
   CsvConverterViewModel({
     required ICsvParserService csvParserService,
     required IKmlGenerationService kmlGenerationService,
-    IEnhancedKmlGenerationService? enhancedKmlGenerationService,
+    required IEnhancedKmlGenerationService enhancedKmlGenerationService,
+    //  IEnhancedKmlGenerationService? enhancedKmlGenerationService,
   }) : _csvParserService = csvParserService,
        _kmlGenerationService = kmlGenerationService,
        _enhancedKmlGenerationService =
@@ -295,7 +296,9 @@ class CsvConverterViewModel extends BaseViewModel {
     }
 
     return _csvData!.rows
-        .map((row) => row.length > columnIndex ? row[columnIndex] : '')
+        .map(
+          (row) => row.length > columnIndex ? row[columnIndex].toString() : '',
+        )
         .toList();
   }
 
@@ -917,23 +920,20 @@ class CsvConverterViewModel extends BaseViewModel {
               ? 'Converted from CSV on $timestamp with ${imageFiles?.length ?? 0} embedded images'
               : 'Converted from CSV on $timestamp';
 
-      // Update generation options for image-enabled KMZ
-      final exportOptions = _generationOptions.copyWith(
-        geometryType: _selectedGeometryType,
-        documentName: documentName,
-        documentDescription: documentDescription,
-        useCustomIcons: true,
-        includeDescription:
-            _generationOptions.includeDescription || hasImageIntegration,
-      );
-
-      // Enhanced KML generation with image references
       late File outputFile;
 
+      // Check if we should use enhanced styling
       if (_useEnhancedStyling &&
           _enhancedStylingOptions != null &&
           _enhancedStylingOptions!.useRuleBasedStyling &&
           _enhancedStylingOptions!.rules.isNotEmpty) {
+        if (kDebugMode) {
+          print('Using Enhanced KMZ Generation Service with Images');
+          print(
+            'Enhanced styling rules: ${_enhancedStylingOptions!.rules.length}',
+          );
+        }
+
         // Use enhanced service for rule-based styling with images
         outputFile = await _enhancedKmlGenerationService.generateKmzWithRules(
           csvData: _csvData!,
@@ -943,12 +943,27 @@ class CsvConverterViewModel extends BaseViewModel {
           documentDescription: documentDescription,
           geometryType: _selectedGeometryType,
           imageFiles: imageFiles,
-          includeElevation: exportOptions.includeElevation,
-          includeDescription: exportOptions.includeDescription,
-          imageColumnName: _selectedImageColumn, // Pass image column info
+          imageColumnName: _selectedImageColumn,
+          imageAssociations: _imageAssociations,
+          includeElevation: _generationOptions.includeElevation,
+          includeDescription: _generationOptions.includeDescription,
         );
       } else {
-        // Use legacy service with image support
+        if (kDebugMode) {
+          print('Using Legacy KMZ Generation Service');
+          print('No enhanced styling rules - using basic styling');
+        }
+
+        // Use legacy service for basic styling with images
+        final exportOptions = _generationOptions.copyWith(
+          geometryType: _selectedGeometryType,
+          documentName: documentName,
+          documentDescription: documentDescription,
+          useCustomIcons: true,
+          includeDescription:
+              _generationOptions.includeDescription || hasImageIntegration,
+        );
+
         outputFile = await _kmlGenerationService.generateKmz(
           csvData: _csvData!,
           columnMapping: _columnMapping!,
@@ -1233,7 +1248,7 @@ class CsvConverterViewModel extends BaseViewModel {
   /// Override the existing CSV processing to include auto-detection
   @override
   Future<void> processSelectedFile() async {
-    await super.processSelectedFile();
+    //  await super.processSelectedFile();
 
     // After CSV is processed, try to auto-detect image column
     if (_csvData != null && !hasError) {
