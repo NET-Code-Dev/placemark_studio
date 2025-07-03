@@ -8,6 +8,7 @@ import '../../../core/enums/geometry_type.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/column_mapping.dart';
 //import '../../../data/models/styling_compatibility.dart';
+import 'widgets/description_options.dart';
 import 'widgets/styling_integration.dart'; // Updated import
 //import 'widgets/export_options_step.dart';
 
@@ -521,10 +522,31 @@ class _CsvConverterContent extends StatelessWidget {
 
           const SizedBox(height: 24),
 
+          // Description Table Options
+          _buildDescriptionOptions(context, viewModel),
+
+          const SizedBox(height: 24),
+
           // Real-time validation section
           _buildValidationSection(context, viewModel),
         ],
       ),
+    );
+  }
+
+  /// Build description options widget
+  Widget _buildDescriptionOptions(
+    BuildContext context,
+    CsvConverterViewModel viewModel,
+  ) {
+    return DescriptionOptionsWidget(
+      availableColumns: viewModel.availableColumns,
+      selectedColumns: viewModel.selectedDescriptionColumns,
+      useTableFormat: viewModel.useDescriptionTable,
+      tableStyle: viewModel.descriptionTableStyle,
+      onColumnsChanged: viewModel.updateDescriptionColumns,
+      onTableFormatChanged: viewModel.setUseDescriptionTable,
+      onTableStyleChanged: viewModel.setDescriptionTableStyle,
     );
   }
 
@@ -557,6 +579,20 @@ class _CsvConverterContent extends StatelessWidget {
                 'Geometry type',
                 viewModel.selectedGeometryType.displayName,
               ),
+
+              // Description table info
+              if (viewModel.useDescriptionTable) ...[
+                _buildInfoRow(
+                  'Description format',
+                  'Table (${viewModel.descriptionTableStyle})',
+                ),
+                _buildInfoRow(
+                  'Description columns',
+                  '${viewModel.selectedDescriptionColumns.length} selected',
+                ),
+              ] else if (viewModel.generationOptions.includeDescription) ...[
+                _buildInfoRow('Description format', 'Single column'),
+              ],
 
               // Enhanced styling information
               if (viewModel.useEnhancedStyling &&

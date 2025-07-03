@@ -555,9 +555,8 @@ class KmlGenerationService implements IKmlGenerationService {
     buffer.writeln('    <name>${_escapeXml(name)}</name>');
 
     // Description
-    if (options.includeDescription && columnMapping.descriptionColumn != null) {
-      final description =
-          row[columnMapping.descriptionColumn]?.toString() ?? '';
+    if (options.includeDescription) {
+      final description = _generateDescription(row, columnMapping, options);
       if (description.isNotEmpty) {
         buffer.writeln(
           '    <description><![CDATA[$description]]></description>',

@@ -36,6 +36,9 @@ class CsvConverterViewModel extends BaseViewModel {
   ColumnMapping? _columnMapping;
   ConversionStep _currentStep = ConversionStep.fileSelection;
   String? _successMessage;
+  List<String> _selectedDescriptionColumns = [];
+  bool _useDescriptionTable = false;
+  String _descriptionTableStyle = 'simple';
 
   // Configuration
   GeometryType _selectedGeometryType = GeometryType.point;
@@ -68,6 +71,9 @@ class CsvConverterViewModel extends BaseViewModel {
   StylingOptions get currentStylingOptions => _stylingOptions;
   String? get outputPath => _outputPath;
   List<String>? get previewColumnValues => _previewColumnValues;
+  List<String> get selectedDescriptionColumns => _selectedDescriptionColumns;
+  bool get useDescriptionTable => _useDescriptionTable;
+  String get descriptionTableStyle => _descriptionTableStyle;
 
   // Enhanced styling getters
   EnhancedStylingOptions get enhancedStylingOptions =>
@@ -333,6 +339,38 @@ class CsvConverterViewModel extends BaseViewModel {
     return header == 'description' ||
         header == 'desc' ||
         header.contains('desc');
+  }
+
+  void updateDescriptionColumns(List<String> columns) {
+    _selectedDescriptionColumns = columns;
+    _updateGenerationOptionsWithDescription();
+    notifyListeners();
+  }
+
+  void setUseDescriptionTable(bool useTable) {
+    _useDescriptionTable = useTable;
+    if (!useTable) {
+      _selectedDescriptionColumns = []; // Clear selections when disabled
+    }
+    _updateGenerationOptionsWithDescription();
+    notifyListeners();
+  }
+
+  void setDescriptionTableStyle(String style) {
+    _descriptionTableStyle = style;
+    _updateGenerationOptionsWithDescription();
+    notifyListeners();
+  }
+
+  /// Update generation options with description table settings
+  void _updateGenerationOptionsWithDescription() {
+    _generationOptions = _generationOptions.copyWith(
+      useDescriptionTable: _useDescriptionTable,
+      descriptionColumns:
+          _useDescriptionTable ? _selectedDescriptionColumns : null,
+      descriptionTableStyle:
+          _useDescriptionTable ? _descriptionTableStyle : null,
+    );
   }
 
   /// Update column mapping
@@ -887,6 +925,9 @@ class CsvConverterViewModel extends BaseViewModel {
     _currentStep = ConversionStep.fileSelection;
     _successMessage = null;
     _outputPath = null;
+    _selectedDescriptionColumns = [];
+    _useDescriptionTable = false;
+    _descriptionTableStyle = 'simple';
 
     // Reset to defaults
     _selectedGeometryType = GeometryType.point;

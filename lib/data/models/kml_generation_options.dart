@@ -120,6 +120,10 @@ class KmlGenerationOptions {
     bool? useCustomIcons,
     Map<String, StyleRule>? styleRules,
     String? outputPath,
+    DefaultStyleConfig? defaultStyle,
+    List<String>? descriptionColumns,
+    bool? useDescriptionTable,
+    String? descriptionTableStyle,
   }) {
     return KmlGenerationOptions(
       documentName: documentName ?? this.documentName,
@@ -130,6 +134,11 @@ class KmlGenerationOptions {
       useCustomIcons: useCustomIcons ?? this.useCustomIcons,
       styleRules: styleRules ?? this.styleRules,
       outputPath: outputPath ?? this.outputPath,
+      defaultStyle: defaultStyle ?? this.defaultStyle,
+      descriptionColumns: descriptionColumns ?? this.descriptionColumns,
+      useDescriptionTable: useDescriptionTable ?? this.useDescriptionTable,
+      descriptionTableStyle:
+          descriptionTableStyle ?? this.descriptionTableStyle,
     );
   }
 

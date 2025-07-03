@@ -95,39 +95,33 @@ class CsvParserService implements ICsvParserService {
       }
 
       // Extract headers from first row
-      final headers = csvData.first.map((e) => e.toString().trim()).toList();
+      final rawHeaders = csvData.first.map((e) => e.toString().trim()).toList();
 
-      if (headers.isEmpty) {
+      if (rawHeaders.isEmpty) {
         throw FileProcessingException(
           'No headers found in CSV file',
           code: 'NO_CSV_HEADERS',
         );
       }
 
-      // Validate headers for duplicates
-      final uniqueHeaders = <String>{};
-      final duplicateHeaders = <String>[];
+      // FIXED: Clean headers and handle duplicates instead of throwing error
+      final headers = _cleanHeaders(rawHeaders);
 
-      for (final header in headers) {
-        if (header.isEmpty) {
-          throw FileProcessingException(
-            'Empty column header found in CSV file',
-            code: 'EMPTY_HEADER',
-          );
+      if (kDebugMode) {
+        // Show what headers were cleaned
+        final changedHeaders = <String>[];
+        for (int i = 0; i < rawHeaders.length && i < headers.length; i++) {
+          if (rawHeaders[i] != headers[i]) {
+            changedHeaders.add('${rawHeaders[i]} → ${headers[i]}');
+          }
         }
 
-        if (uniqueHeaders.contains(header)) {
-          duplicateHeaders.add(header);
-        } else {
-          uniqueHeaders.add(header);
+        if (changedHeaders.isNotEmpty) {
+          print('Header cleaning applied:');
+          for (final change in changedHeaders) {
+            print('  $change');
+          }
         }
-      }
-
-      if (duplicateHeaders.isNotEmpty) {
-        throw FileProcessingException(
-          'Duplicate column headers found: ${duplicateHeaders.join(', ')}',
-          code: 'DUPLICATE_HEADERS',
-        );
       }
 
       // Process data rows
@@ -140,7 +134,7 @@ class CsvParserService implements ICsvParserService {
         );
       }
 
-      // Convert rows to maps
+      // Convert rows to maps using cleaned headers
       final rows = <Map<String, dynamic>>[];
 
       for (int i = 0; i < dataRows.length; i++) {
@@ -159,9 +153,10 @@ class CsvParserService implements ICsvParserService {
       if (kDebugMode) {
         print('CSV parsed successfully:');
         print('  File: $fileName');
-        print('  Headers: ${headers.length} (${headers.join(', ')})');
+        print(
+          '  Headers: ${headers.length} (${headers.take(5).join(', ')}${headers.length > 5 ? '...' : ''})',
+        );
         print('  Rows: ${rows.length}');
-        print('  Sample row: ${rows.isNotEmpty ? rows.first : 'none'}');
       }
 
       return CsvData(fileName: fileName, headers: headers, rows: rows);
@@ -214,9 +209,9 @@ class CsvParserService implements ICsvParserService {
     final lines = content.split('\n').take(5).toList();
     final sampleContent = lines.join('\n');
 
-    // Test common delimiters
+    // Test common delimiters - COMMA FIRST (preferred)
     final delimiters = [',', ';', '\t', '|'];
-    final scores = <String, int>{};
+    final scores = <String, Map<String, dynamic>>{};
 
     if (kDebugMode) {
       print('=== CSV DELIMITER DETECTION ===');
@@ -231,13 +226,12 @@ class CsvParserService implements ICsvParserService {
           fieldDelimiter: delimiter,
           textDelimiter: '"',
           shouldParseNumbers: false,
-          allowInvalid: true, // Allow invalid CSV to continue parsing
+          allowInvalid: true,
         );
 
         final parsed = converter.convert(sampleContent);
 
         if (parsed.isNotEmpty) {
-          // Score based on consistency of column counts and reasonable column numbers
           final columnCounts = parsed.map((row) => row.length).toList();
           final firstRowCount = columnCounts.first;
 
@@ -247,45 +241,79 @@ class CsvParserService implements ICsvParserService {
           final consistencyScore =
               (consistentRows * 100) ~/ columnCounts.length;
 
-          // Prefer delimiters that result in reasonable number of columns (2-200)
+          // IMPROVED SCORING: Heavily favor reasonable column counts (2-100)
           int columnScore = 0;
-          if (firstRowCount >= 2 && firstRowCount <= 200) {
-            columnScore = math.min(firstRowCount, 50); // Cap bonus at 50
+          if (firstRowCount >= 2 && firstRowCount <= 100) {
+            columnScore = firstRowCount; // Direct scoring based on column count
+          } else if (firstRowCount > 100) {
+            // Penalize excessive columns (likely parsing error)
+            columnScore = math.max(0, 100 - (firstRowCount - 100));
           }
 
-          final totalScore = consistencyScore + columnScore;
-          scores[delimiter] = totalScore;
+          // COMMA BONUS: Give comma delimiter a bonus since it's most common
+          int delimiterBonus = 0;
+          if (delimiter == ',') {
+            delimiterBonus = 50; // Significant bonus for comma
+          } else if (delimiter == ';') {
+            delimiterBonus = 20; // Smaller bonus for semicolon
+          }
+
+          final totalScore = consistencyScore + columnScore + delimiterBonus;
+
+          scores[delimiter] = {
+            'columns': firstRowCount,
+            'consistency': consistencyScore,
+            'columnScore': columnScore,
+            'delimiterBonus': delimiterBonus,
+            'totalScore': totalScore,
+          };
 
           if (kDebugMode) {
+            final delimiterName = delimiter == '\t' ? 'TAB' : delimiter;
             print(
-              'Delimiter "$delimiter": $firstRowCount columns, consistency: $consistencyScore%, score: $totalScore',
+              'Delimiter "$delimiterName": $firstRowCount columns, consistency: $consistencyScore%, columnScore: $columnScore, bonus: $delimiterBonus, total: $totalScore',
             );
           }
         }
       } catch (e) {
-        scores[delimiter] = 0;
+        scores[delimiter] = {
+          'columns': 0,
+          'totalScore': 0,
+          'error': e.toString(),
+        };
         if (kDebugMode) {
-          print('Delimiter "$delimiter" failed: $e');
+          final delimiterName = delimiter == '\t' ? 'TAB' : delimiter;
+          print('Delimiter "$delimiterName" failed: $e');
         }
       }
     }
 
     // Return delimiter with highest score, defaulting to comma
-    if (scores.isEmpty || scores.values.every((score) => score == 0)) {
+    if (scores.isEmpty ||
+        scores.values.every((score) => score['totalScore'] == 0)) {
       if (kDebugMode) {
         print('No valid delimiter found, defaulting to comma');
       }
       return ',';
     }
 
-    final bestEntry = scores.entries.reduce(
-      (a, b) => a.value > b.value ? a : b,
-    );
-    final bestDelimiter = bestEntry.key;
+    // Find delimiter with highest total score
+    String bestDelimiter = ',';
+    int bestScore = 0;
+
+    scores.forEach((delimiter, scoreData) {
+      final totalScore = scoreData['totalScore'] as int;
+      if (totalScore > bestScore) {
+        bestScore = totalScore;
+        bestDelimiter = delimiter;
+      }
+    });
 
     if (kDebugMode) {
+      final delimiterName = bestDelimiter == '\t' ? 'TAB' : bestDelimiter;
+      final scoreData = scores[bestDelimiter]!;
       print(
-        'Selected delimiter: "$bestDelimiter" with score: ${bestEntry.value}',
+        'Selected delimiter: "$delimiterName" with score: $bestScore (${scoreData['columns']} columns)',
       );
     }
 
@@ -310,5 +338,39 @@ class CsvParserService implements ICsvParserService {
     }
 
     return stringValue;
+  }
+
+  /// Clean and make headers unique to handle duplicates
+  List<String> _cleanHeaders(List<String> rawHeaders) {
+    final cleanHeaders = <String>[];
+    final headerCounts = <String, int>{};
+
+    for (final header in rawHeaders) {
+      // Clean the header by removing special characters and trimming
+      var cleanHeader = header
+          .trim()
+          .replaceAll(RegExp(r'::+'), '_') // Replace :: with _
+          .replaceAll(RegExp(r'[(),]'), '') // Remove parentheses and commas
+          .replaceAll(RegExp(r'\s+'), '_') // Replace spaces with _
+          .replaceAll(RegExp(r'_+'), '_') // Replace multiple _ with single _
+          .replaceAll(RegExp(r'^_|_$'), ''); // Remove leading/trailing _
+
+      // Handle empty headers
+      if (cleanHeader.isEmpty) {
+        cleanHeader = 'Column';
+      }
+
+      // Handle duplicates by adding a suffix
+      if (headerCounts.containsKey(cleanHeader)) {
+        headerCounts[cleanHeader] = headerCounts[cleanHeader]! + 1;
+        cleanHeader = '${cleanHeader}_${headerCounts[cleanHeader]}';
+      } else {
+        headerCounts[cleanHeader] = 1;
+      }
+
+      cleanHeaders.add(cleanHeader);
+    }
+
+    return cleanHeaders;
   }
 }
